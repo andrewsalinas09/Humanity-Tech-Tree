@@ -9,7 +9,6 @@
 
 enum class NodeCategory {
     // --- The Actors ---
-    META_ROOT,          // "Humanity" (The single root node)
     PERSON,             // "Isaac Newton"
     GROUP,              // "The Royal Society"
 
@@ -30,6 +29,9 @@ enum class EdgeType {
     // --- Optimization (The "Lathe" Loop Solution) ---
     // Implies: "Target works without Source, but is inefficient."
     OPTIMIZATION_FACTOR, 
+
+    INHIBITOR, // Dogma -> Astronomy
+    MOTIVATED_BY, // "Psychohistory" (Miasma -> Sewer Systems)
     
     // --- Origins (Person -> Artifact) ---
     // Covers both "Invented" and "Discovered"
@@ -40,7 +42,8 @@ enum class EdgeType {
 
     // --- Intellectual ---
     INSPIRATION,        // Idea transfer only
-    DISPROVES           // (Oxygen -> Phlogiston)
+    DISPROVES,           // (Oxygen -> Phlogiston)
+    REPLACES, // DVD -> BluRay
 };
 
 enum class ValidityStatus {
