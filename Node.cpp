@@ -10,48 +10,94 @@
 enum class NodeCategory {
     // --- The Actors ---
     PERSON,             // "Isaac Newton"
-    GROUP,              // "The Royal Society"
+    ORGANIZATION,              // "The Royal Society"
+    GEOPOLITICAL_ENTITY,
 
-    // --- The Artifacts ---
-    INVENTION,          // "Steam Engine"
-    DISCOVERY,          // "Gravity"
-    EVENT,              // "WWII"
-    CONCEPT,            // "Calculus", "Binary Logic"
-    LAW_CONSTRAINT,     // "Copyright", "Resource Shortage"
+    WORK_PUBLICATION, //Books, publications
+    LEGISLATION,     // "Copyright", "Resource Shortage"
+
+    HISTORICAL_EVENT,              // "WWII"
+    SOCIETAL_ERA,
     BELIEF_SYSTEM,       // "Miasma", "Geocentrism"
-    WORKS, //Books, publications
+
+    SOCIETAL_NEED,      // "Faster Travel", "Shelter", "Food Preservation"
+
+    // --- TIER 1: THE DRIVERS (Why?) ---
+    NATURAL_LAW,        // "Thermodynamics", "Electromagnetism"
+    FORMAL_CONCEPT,     // "Boolean Logic", "Geometry"
+    CAPABILITY,         // "Precision < 0.01mm", "Global Instant Comms"
+
+
+    // --- TIER 2: THE ENABLERS (How?) ---
+    MATERIAL,           // "Steel", "Silicon", "Rubber", "Vulcanized Rubber"
+    METHOD_TECHNIQUE,   // "Casting", "Photolithography", "Triangulation"
+    STANDARD_UNIT,      // "The Meter", "TCP/IP Protocol", "IEEE 802.11"
+
+    // --- TIER 3: THE BUILDERS (The recursive part) ---
+    // These are distinct because they are used *during* creation but don't end up inside the product.
+    TOOL_INSTRUMENT,    // "Lathe", "Oscilloscope", "Compiler", "Surface Plate"
+
+    // --- TIER 4: THE TECHNOLOGY (The What?) ---
+    COMPONENT,          // "Piston", "Transistor", "WiFi Chipset" (Parts)
+    TECH_PARADIGM,      // "Internal Combustion Engine", "Smartphone", "Internet" (The Abstract Machine)
+
+    // --- TIER 5: THE INSTANCE (The Real Thing) ---
+    ARTIFACT            // "Ford Model T", "iPhone 1", "Intel 4004"
+
 };
 
 enum class EdgeType {
-    // --- Causality (Artifact -> Artifact) ---
-    HARD_REQ,           // Impossible without (Transistor -> CPU)
-    COMPONENT_OF,       // (Tire -> Car)
-    
-    // --- Optimization (The "Lathe" Loop Solution) ---
-    // Implies: "Target works without Source, but is inefficient."
-    OPTIMIZATION_FACTOR, 
+    // ==========================================
+    // GROUP 1: THE HARD TECH TREE (The "Must Haves")
+    // ==========================================
+    // These dictate if a technology works.
 
-    INHIBITOR, // Dogma -> Astronomy
-    MOTIVATED_BY, // "Psychohistory" (Miasma -> Sewer Systems)
-    
-    // --- Origins (Person -> Artifact) ---
-    // Covers both "Invented" and "Discovered"
-    DISCOVERED_BY,      // (Newton -> Calculus)
-    CREATED_BY, // for inventiosn and works like "principa mathematica"
-    
-    // --- Genealogy (Root -> Person) ---
-    MEMBER_OF,          // (Humanity -> Newton) or (Royal Society -> Newton)
-    EDUCATED_BY, // What school they went to
-    INFLUENCED_BY, // Who their mentors were
-    REQUIRES_KNOWLEDGE, // Newton requires having known algebra, geometry, etc...
+    MAKES_POSSIBLE,      // Physics -> Capability ("Optics" MAKES_POSSIBLE "Magnification")
+    IS_COMPONENT_OF,     // Component -> Paradigm ("Lens" IS_COMPONENT_OF "Telescope")
+    IS_INGREDIENT_OF,    // Material -> Component ("Glass" IS_INGREDIENT_OF "Lens")
+    OPTIMIZES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
+    IMPLEMENTS,          // Artifact -> Paradigm ("Hubble" IMPLEMENTS "Space Telescope")
 
-    // --- Intellectual ---
-    INSPIRATION,        // Idea transfer only
-    DISPROVES,           // (Oxygen -> Phlogiston)
-    REPLACES, // DVD -> BluRay
-};
+    // ==========================================
+    // GROUP 2: THE HUMAN CONTEXT (The "Who & When")
+    // ==========================================
+    // These connect People to the Tree.
 
-enum class ValidityStatus {
+    // --- Origin Stories ---
+    AUTHORED,            // Person -> Work ("Newton" AUTHORED "Principia")
+    DISCOVERED,          // Person -> Natural_Law ("Archimedes" DISCOVERED "Buoyancy")
+                         // *Use this if they didn't write a specific book, or as a shorthand.*
+    INVENTED,            // Person -> Tech_Paradigm ("Bell" INVENTED "Telephone")
+
+    // --- Intellectual Lineage ---
+    INFLUENCED_BY,       // Person -> Person ("Aristotle" INFLUENCED_BY "Plato")
+    STUDIED_AT,          // Person -> Org ("Newton" STUDIED_AT "Cambridge")
+
+    // --- The "Time Gate" ---
+    REQUIRES_KNOWLEDGE,  // Person -> Concept ("Newton" REQUIRES_KNOWLEDGE "Algebra")
+                         // *Validation Rule: A Person cannot exist before their required knowledge.*
+
+    // ==========================================
+    // GROUP 3: EVOLUTION & CONFLICT (The "Story")
+    // ==========================================
+    // These describe how ideas change over time.
+
+    // --- Transition ---
+    REPLACES,            // Paradigm -> Paradigm ("Transistor" REPLACES "Vacuum Tube")
+                         // *UI Logic: Often implies the old one stops being used.*
+    SUPERSEDES,          // Law -> Law ("Relativity" SUPERSEDES "Newtonian Gravity")
+                         // *Note: The old one is still useful (Newton), but less accurate.*
+
+    // --- Conflict ---
+    DISPROVES,           // Concept -> Belief ("Germ Theory" DISPROVES "Miasma")
+    INHIBITS,            // Belief -> Concept ("Geocentrism" INHIBITS "Astronomy")
+
+    // --- Motivation ---
+    MOTIVATED_BY,        // Concept -> Concept ("Chemistry" MOTIVATED_BY "Alchemy")
+                         // *Use when the predecessor was "wrong" but led to the right path.*
+    DRIVEN_BY_NEED,      // Paradigm -> Societal_Need ("Vaccines" DRIVEN_BY_NEED "Smallpox")
+
+};enum class ValidityStatus {
     CURRENT_TRUTH,      // (Germ Theory)
     DISPROVEN,          // (Phlogiston)
     SUPERSEDED,         // (Newtonian Physics)
