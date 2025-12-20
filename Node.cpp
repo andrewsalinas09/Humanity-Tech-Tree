@@ -18,7 +18,8 @@ enum class NodeCategory {
     EVENT,              // "WWII"
     CONCEPT,            // "Calculus", "Binary Logic"
     LAW_CONSTRAINT,     // "Copyright", "Resource Shortage"
-    BELIEF_SYSTEM       // "Miasma", "Geocentrism"
+    BELIEF_SYSTEM,       // "Miasma", "Geocentrism"
+    WORKS, //Books, publications
 };
 
 enum class EdgeType {
@@ -36,6 +37,7 @@ enum class EdgeType {
     // --- Origins (Person -> Artifact) ---
     // Covers both "Invented" and "Discovered"
     DISCOVERED_BY,      // (Newton -> Calculus)
+    CREATED_BY, // for inventiosn and works like "principa mathematica"
     
     // --- Genealogy (Root -> Person) ---
     MEMBER_OF,          // (Humanity -> Newton) or (Royal Society -> Newton)
