@@ -39,6 +39,9 @@ enum class EdgeType {
     
     // --- Genealogy (Root -> Person) ---
     MEMBER_OF,          // (Humanity -> Newton) or (Royal Society -> Newton)
+    EDUCATED_BY, // What school they went to
+    INFLUENCED_BY, // Who their mentors were
+    REQUIRES_KNOWLEDGE, // Newton requires having known algebra, geometry, etc...
 
     // --- Intellectual ---
     INSPIRATION,        // Idea transfer only
