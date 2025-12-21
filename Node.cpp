@@ -123,14 +123,6 @@ enum class EpistemicStatus {
 // 2. TEMPORAL & SPATIAL STRUCTS
 // ==========================================
 
-struct FuzzyTime {
-    long long year_start;   // Year (Negative for BCE)
-    std::optional<long long> year_end; // Null if still active/alive
-    
-    // String for UI display logic (e.g. "Late 14th Century")
-    std::string display_string; 
-};
-
 // Distinguishes the "Texture" of time
 enum class TimeScale {
     GEOLOGICAL,     // "2 Million Years Ago" (Stone Tools) - Huge error bars
@@ -186,13 +178,15 @@ struct RegionalAvailability {
     std::string region_id;      // "geo:china", "geo:europe"
     
     // When was it active HERE? 
-    // Note: Multiple entries for the same region allow for "Dark Ages" 
-    // (e.g. Concrete lost in Europe then found again).
-    FuzzyTime local_timeline;   
-    
+    // Uses the new Timeline system to support "Lost & Found" logic.
+    Timeline local_timeline;
+
     // Provenance
     bool is_indigenous;         // Did it start here?
     std::string import_source;  // If false, where did it come from? ("geo:china")
+
+    // Citations for this specific regional claim
+    std::vector<std::string> source_citations;
 };
 
 struct ResourceCost {
@@ -240,15 +234,16 @@ struct DependencyEdge {
     std::string to_node_id;
     
     EdgeType type;
-
     EpistemicStatus truth_level;
 
     // --- THE LOGIC (The Math) ---
     // If empty/null: This is a MANDATORY requirement (AND).
     // If set (0, 1, 2): This is part of an ALTERNATIVE path (OR).
     std::optional<int> alternative_path_id;
-    
 
+    // --- THE VISUALS (The UI) ---
+    // Groups edges together visually (e.g. "Inventors", "Components")
+    std::string visual_category_slug;
 
     // --- Simulation Data ---
     float impact_weight;        // 0.0 - 1.0

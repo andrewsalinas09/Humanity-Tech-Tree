@@ -1,0 +1,3 @@
+make way to add and remove without breaking anything
+make version control so it's easy to merge and revert
+alogrhitms to do things like search for things by naming components for example [WiFi, Touchsreen] you then get everything that uses wifi, everything that uses touchscreen and then intersect and then keep going down. You add cellular radio and then smartphone pops out. etc...
