@@ -181,8 +181,10 @@ struct Timeline {
 
 struct RegionalAvailability {
     // Where is this active?
-    std::string region_id;      // "geo:china", "geo:europe"
-    
+    std::string historical_region;      // "geo:china", "geo:europe"
+    std::string current_region;      // "geo:china", "geo:europe"
+    std::string coordinates;      // 52.520008N, 13.404954W
+
     // When was it active HERE? 
     // Uses the new Timeline system to support "Lost & Found" logic.
     Timeline local_timeline;
