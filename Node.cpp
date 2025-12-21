@@ -231,6 +231,20 @@ struct HistoryNode {
     std::string image_url;
 };
 
+struct OptimizationFactors {
+    // 0.0 = No change (Neutral)
+    // 1.0 = 2x better (100% improvement)
+    // -0.5 = 50% worse (Trade-off)
+
+    float cost_efficiency;   // Making it cheaper
+    float production_rate;   // Making it faster (Throughput)
+    float quality_reliability; // Making it better/longer lasting
+    float size_weight;       // Making it smaller/lighter (Miniaturization)
+    float energy_efficiency; // Using less power
+    float safety;            // Less likely to kill the user
+    float accessibility;     // Lowers the barrier to entry
+};
+
 // ==========================================
 // 4. THE EDGE
 // ==========================================
@@ -244,6 +258,8 @@ struct DependencyEdge {
     EpistemicStatus truth_level;
     ValidityStatus validity;
     ResourceCost base_cost; // Aluminum will have edges to multiple things, each will have different costs.
+
+    OptimizationFactors optimization_factor;
 
     // if this start and ends multiple times have an edge for each instance dont' have a vector here
     std::optional<DatePoint> start_date;
