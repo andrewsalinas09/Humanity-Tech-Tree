@@ -187,7 +187,7 @@ struct RegionalAvailability {
     std::string current_region;      // "geo:china", "geo:europe"
     std::string coordinates;      // 52.520008N, 13.404954W
 
-    // When was it active HERE? 
+    // When was it active HERE?
     // Uses the new Timeline system to support "Lost & Found" logic.
     Timeline local_timeline;
 
@@ -201,9 +201,9 @@ struct RegionalAvailability {
 
 struct ResourceCost {
     // Normalized 0.0 - 1.0 for simulation difficulty
-    float labor_intensity;  
-    float knowledge_depth;  
-    float resource_rarity;  
+    float labor_intensity;
+    float knowledge_depth;
+    float resource_rarity;
 };
 
 // ==========================================
@@ -216,19 +216,19 @@ struct HistoryNode {
     std::string sub_id; // if a specific version of the node for example iPhone 16 will be 0 if its the generic version
     std::string wikidata_id;    // "Q12345"
     std::string slug;           // "steam-engine"
-    
+
     // --- Core Data ---
     std::string name;
     NodeCategory category;
     ValidityStatus validity;
-    
+
     // --- Simulation Properties ---
     // This vector handles the "Gunpowder" problem.
     // One node, multiple start dates depending on location.
     std::vector<RegionalAvailability> availability;
-    
+
     int zoom_level;
-    
+
     // --- Content ---
     std::string wiki_summary;
     std::string image_url;
@@ -274,7 +274,7 @@ struct DependencyEdge {
     std::string id;
     std::string from_node_id;
     std::string to_node_id;
-    
+
     EdgeType type;
     EpistemicStatus truth_level;
     ValidityStatus validity;
