@@ -259,7 +259,7 @@ struct DependencyEdge {
     ValidityStatus validity;
     ResourceCost base_cost; // Aluminum will have edges to multiple things, each will have different costs.
 
-    OptimizationFactors optimization_factor;
+    std::optional<OptimizationFactors> optimization_factor;
 
     // if this start and ends multiple times have an edge for each instance dont' have a vector here
     std::optional<DatePoint> start_date;
