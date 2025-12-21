@@ -131,6 +131,56 @@ struct FuzzyTime {
     std::string display_string; 
 };
 
+// Distinguishes the "Texture" of time
+enum class TimeScale {
+    GEOLOGICAL,     // "2 Million Years Ago" (Stone Tools) - Huge error bars
+    ARCHAEOLOGICAL, // "Bronze Age" - Dated by strata/carbon
+    HISTORICAL,     // "July 4, 1776" - Written records
+    MYTHOLOGICAL    // "Before Time" / "The Creation" (For 'Belief' nodes)
+};
+
+// A single point in time with error bars
+struct DatePoint {
+    // We use a signed double for the "True Year"
+    // Negative = BCE, Positive = CE.
+    // Example: -3000.0 is 3000 BC. 2024.5 is June 2024.
+    double year;
+
+    // The "Fuzziness"
+    // 0 = Exact Date (July 16, 1945)
+    // 50 = "c. 1200 BC" (Could be 1250 or 1150)
+    // 10000 = "Paleolithic"
+    double uncertainty_range;
+
+    TimeScale scale;
+};
+
+enum class KnowledgeStatus {
+    ACTIVE,         // People use this daily (Smartphones today)
+    THEORETICAL,    // Concept exists, but not built (Leonardo's Tank)
+    LOST,           // Knowledge exists in ruins/books, but nobody can do it (Roman Concrete in 600 AD)
+    OBSOLETE,       // We know how, but we chose not to (Steam Locomotives)
+    MYTHICAL        // "Tower of Babel" - Exists in culture, not reality
+};
+
+struct TimeSegment {
+    DatePoint start;
+    std::optional<DatePoint> end; // Null = Ongoing
+
+    KnowledgeStatus status;
+
+    // Why did it end/start?
+    // "Fall of Rome", "Library of Alexandria Burned", "Renaissance"
+    std::string transition_reason_slug;
+};
+
+// This goes inside 'RegionalAvailability'
+struct Timeline {
+    // The sequence of events for THIS region.
+    // Europe: [Active (0-400)] -> [Lost (400-1400)] -> [Active (1400-Present)]
+    std::vector<TimeSegment> segments;
+};
+
 struct RegionalAvailability {
     // Where is this active?
     std::string region_id;      // "geo:china", "geo:europe"
@@ -173,13 +223,8 @@ struct HistoryNode {
     std::vector<RegionalAvailability> availability;
     
     ResourceCost base_cost;
-    int zoom_level;             // 1=Era, 2=Major, 3=Detail
+    int zoom_level;
     
-    // --- Loop Handling ---
-    // Allows UI to stack "Steel I", "Steel II" visually.
-    std::optional<std::string> variant_group_id; 
-    int tech_generation;        
-
     // --- Content ---
     std::string wiki_summary;
     std::string image_url;
