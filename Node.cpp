@@ -251,15 +251,18 @@ struct LogicGroup {
     // 1. The "Slot" or "Role" (AND)
     // Example: 0 = "Primary Material", 1 = "Catalyst"
     int functional_group_id;
+    std::string functional_group_name;
 
     // 2. The "Option" (OR)
     // Example: For Catalyst, 0 = "Platinum", 1 = "Palladium + Heat"
     int variant_id;
+    std::string variant_name;
 
     // 3. The "Fragment" (AND)
     // Example: If Variant 1 is "Palladium + Heat",
     // Palladium is part_id 0, Heat is part_id 1.
     int part_id;
+    std::string part_name;
 };
 
 // ==========================================
