@@ -63,7 +63,7 @@ enum class EdgeType {
     OPTIMIZES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
     IMPLEMENTS,          // Artifact -> Paradigm ("Hubble" IMPLEMENTS "Space Telescope")
 
-    CONFORMS_TO // IEEE 754 // should be from parent down
+    CONFORMS_TO, // IEEE 754 // should be from parent down
     // ==========================================
     // GROUP 2: THE HUMAN CONTEXT (The "Who & When")
     // ==========================================
