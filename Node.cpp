@@ -63,7 +63,7 @@ enum class EdgeType {
     OPTIMIZES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
     IMPLEMENTS,          // Artifact -> Paradigm ("Hubble" IMPLEMENTS "Space Telescope")
 
-    CONFORMS_TO // IEEE 754
+    CONFORMS_TO // IEEE 754 // should be from parent down
     // ==========================================
     // GROUP 2: THE HUMAN CONTEXT (The "Who & When")
     // ==========================================
@@ -76,11 +76,11 @@ enum class EdgeType {
     INVENTED,            // Person -> Tech_Paradigm ("Bell" INVENTED "Telephone")
 
     // --- Intellectual Lineage ---
-    INFLUENCED_BY,       // Person -> Person ("Aristotle" INFLUENCED_BY "Plato")
+    INFLUENCED,       // Person -> Person ("Aristotle" INFLUENCED_BY "Plato")
     STUDIED_AT,          // Person -> Org ("Newton" STUDIED_AT "Cambridge")
 
     // --- The "Time Gate" ---
-    REQUIRES_KNOWLEDGE,  // Person -> Concept ("Newton" REQUIRES_KNOWLEDGE "Algebra")
+    KNOWLEDGE_REQUIREMENT,  // Person -> Concept ("Newton" REQUIRES_KNOWLEDGE "Algebra")
                          // *Validation Rule: A Person cannot exist before their required knowledge.*
 
     // ==========================================
@@ -95,13 +95,13 @@ enum class EdgeType {
                          // *Note: The old one is still useful (Newton), but less accurate.*
 
     // --- Conflict ---
-    DISPROVES,           // Concept -> Belief ("Germ Theory" DISPROVES "Miasma")
+    DISPROVED_BY,           // Concept -> Belief ("Germ Theory" DISPROVES "Miasma")
     INHIBITS,            // Belief -> Concept ("Geocentrism" INHIBITS "Astronomy")
 
     // --- Motivation ---
     MOTIVATED_BY,        // Concept -> Concept ("Chemistry" MOTIVATED_BY "Alchemy")
                          // *Use when the predecessor was "wrong" but led to the right path.*
-    DRIVEN_BY_NEED,      // Paradigm -> Societal_Need ("Vaccines" DRIVEN_BY_NEED "Smallpox")
+    DRIVES_NEED_FOR,      // Paradigm -> Societal_Need ("Vaccines" DRIVEN_BY_NEED "Smallpox")
     PRECIPITATED,         // Assassination of ferdinate -> world war I, stock market crash of 1929 -> great depression
     GAVE_RISE_TO, // the blues -> jazz, prohibition -> organized crime
 
@@ -125,6 +125,14 @@ enum class EpistemicStatus {
     // --- The "User Filter" Zone ---
     FRINGE_THEORY,      // "Aliens built Pyramids", "Phantom Time Hypothesis"
     MYTHOLOGY,          // "Prometheus gave fire to humans"
+};
+
+// [KEPT] The State Machine is still needed to calculate if an Abstract Node
+// is "Real" (has working children) or "Theoretical" (has no working children).
+enum class NodeState {
+    LOCKED,         // Impossible (Physics/Parents missing).
+    THEORETICAL,    // Concept valid, but no Instances are working. (Vaporware)
+    REALIZED        // Concept valid + >0 Instances are functional.
 };
 
 // ==========================================
@@ -221,6 +229,11 @@ struct HistoryNode {
     std::string name;
     NodeCategory category;
     ValidityStatus validity;
+
+
+    NodeState current_state = NodeState::REALIZED;
+    int active_instance_count = 0;
+
 
     // --- Simulation Properties ---
     // This vector handles the "Gunpowder" problem.
