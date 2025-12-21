@@ -228,6 +228,7 @@ struct HistoryNode {
 
     // --- Core Data ---
     std::string name;
+    std::vector<std::string> aliases;
     NodeCategory category;
     ValidityStatus validity;
 
