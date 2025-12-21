@@ -8,8 +8,11 @@
 // ==========================================
 
 enum class NodeCategory {
+    // --- Roots ---
+    BIOLOGICAL_ENTITY,             // "Isaac Newton", "Humanity", "Aliens"
+    // note that earth, mars, moon, universe are under natural phenomenon
+
     // --- The Actors ---
-    PERSON,             // "Isaac Newton"
     ORGANIZATION,              // "The Royal Society"
     GEOPOLITICAL_ENTITY,
 
@@ -21,6 +24,8 @@ enum class NodeCategory {
     BELIEF_SYSTEM,       // "Miasma", "Geocentrism"
 
     SOCIETAL_NEED,      // "Faster Travel", "Shelter", "Food Preservation"
+
+    NATURAL_PHENOMENON, // Malaria, Winter, Drought, The Tides, Hurricanes
 
     // --- TIER 1: THE DRIVERS (Why?) ---
     NATURAL_LAW,        // "Thermodynamics", "Electromagnetism"
@@ -58,6 +63,7 @@ enum class EdgeType {
     OPTIMIZES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
     IMPLEMENTS,          // Artifact -> Paradigm ("Hubble" IMPLEMENTS "Space Telescope")
 
+    CONFORMS_TO // IEEE 754
     // ==========================================
     // GROUP 2: THE HUMAN CONTEXT (The "Who & When")
     // ==========================================
@@ -235,6 +241,11 @@ struct DependencyEdge {
     
     EdgeType type;
     EpistemicStatus truth_level;
+    ValidityStatus validity;
+
+    // if this start and ends multiple times have an edge for each instance dont' have a vector here
+    std::optional<DatePoint> start_date;
+    std::optional<DatePoint> end_date;
 
     // --- THE LOGIC (The Math) ---
     // If empty/null: This is a MANDATORY requirement (AND).
