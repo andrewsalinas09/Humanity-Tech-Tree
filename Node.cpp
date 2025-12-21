@@ -62,6 +62,8 @@ enum class EdgeType {
     IS_INGREDIENT_OF,    // Material -> Component ("Glass" IS_INGREDIENT_OF "Lens")
     SPECIFIES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
     IMPLEMENTS,          // Artifact -> Paradigm ("Hubble" IMPLEMENTS "Space Telescope")
+    IS_TYPE_OF,          // RAM -> Computer Memory, DDR -> RAM,
+    IS_REFINEMENT_OF,    // DDR4 -> DDR
 
     CONFORMS_TO, // IEEE 754 // should be from parent down
     // ==========================================
