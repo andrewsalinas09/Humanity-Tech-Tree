@@ -222,7 +222,6 @@ struct HistoryNode {
     // One node, multiple start dates depending on location.
     std::vector<RegionalAvailability> availability;
     
-    ResourceCost base_cost;
     int zoom_level;
     
     // --- Content ---
@@ -242,6 +241,7 @@ struct DependencyEdge {
     EdgeType type;
     EpistemicStatus truth_level;
     ValidityStatus validity;
+    ResourceCost base_cost; // Aluminum will have edges to multiple things, each will have different costs.
 
     // if this start and ends multiple times have an edge for each instance dont' have a vector here
     std::optional<DatePoint> start_date;
