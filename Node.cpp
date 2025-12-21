@@ -65,7 +65,7 @@ enum class EdgeType {
     IS_TYPE_OF,          // RAM -> Computer Memory, DDR -> RAM,
     IS_REFINEMENT_OF,    // DDR4 -> DDR
 
-    CONFORMS_TO, // IEEE 754 // should be from parent down
+    SPECIFIES, // IEEE 754
     // ==========================================
     // GROUP 2: THE HUMAN CONTEXT (The "Who & When")
     // ==========================================
@@ -223,7 +223,6 @@ struct ResourceCost {
 struct HistoryNode {
     // --- Identity ---
     std::string primary_id;             // UUID
-    std::string sub_id; // if a specific version of the node for example iPhone 16 will be 0 if its the generic version
     std::string wikidata_id;    // "Q12345"
     std::string slug;           // "steam-engine"
 
