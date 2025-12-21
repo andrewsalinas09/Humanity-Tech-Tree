@@ -105,6 +105,20 @@ enum class EdgeType {
     SUBJECTIVE          // (Modernism)
 };
 
+enum class EpistemicStatus {
+    // --- The History Books ---
+    MAINSTREAM_FACT,    // "Egyptians built Pyramids" (Default)
+    HIGH_CONFIDENCE,    // "Vikings reached America" (Accepted theory)
+
+    // --- The Edge Cases ---
+    DEBATED,            // "Shakespeare authorship question"
+    UNCERTAIN_ORIGIN,   // "Who invented the compass first?"
+
+    // --- The "User Filter" Zone ---
+    FRINGE_THEORY,      // "Aliens built Pyramids", "Phantom Time Hypothesis"
+    MYTHOLOGY,          // "Prometheus gave fire to humans"
+};
+
 // ==========================================
 // 2. TEMPORAL & SPATIAL STRUCTS
 // ==========================================
@@ -181,19 +195,19 @@ struct DependencyEdge {
     std::string to_node_id;
     
     EdgeType type;
+
+    EpistemicStatus truth_level;
+
+    // --- THE LOGIC (The Math) ---
+    // If empty/null: This is a MANDATORY requirement (AND).
+    // If set (0, 1, 2): This is part of an ALTERNATIVE path (OR).
+    std::optional<int> alternative_path_id;
     
-    // --- The "Leibniz" Solution ---
-    // If multiple edges go to the same Target with the same type,
-    // they are usually "AND" requirements.
-    // IF they share a discovery_group_id, they are "OR" (Independent Discovery).
-    // -1 = Standard Logic (AND)
-    //  0 = Newton's Group
-    //  1 = Leibniz's Group
-    int discovery_group_id; 
+
 
     // --- Simulation Data ---
     float impact_weight;        // 0.0 - 1.0
-    
+
     // --- Metadata ---
     std::string justification;
     std::vector<std::string> source_urls;
