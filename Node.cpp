@@ -39,7 +39,7 @@ enum class NodeCategory {
 
     // --- TIER 4: THE TECHNOLOGY (The What?) ---
     //COMPONENT,          // "Piston", "Transistor", "WiFi Chipset" (Parts)
-    TECHNOLOGY,      // "Internal Combustion Engine", "Smartphone", "Internet" (The Abstract Machine)
+    TECHNOLOGY,      // "Internal Combustion Engine", "Smartphone", "Internet" (The Abstract Machine) // also includes tool/instrument/component/artifact
 
     // --- TIER 5: THE INSTANCE (The Real Thing) ---
     // ARTIFACT            // "Ford Model T", "iPhone 1", "Intel 4004"
