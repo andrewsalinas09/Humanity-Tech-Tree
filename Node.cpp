@@ -102,6 +102,8 @@ enum class EdgeType {
     MOTIVATED_BY,        // Concept -> Concept ("Chemistry" MOTIVATED_BY "Alchemy")
                          // *Use when the predecessor was "wrong" but led to the right path.*
     DRIVEN_BY_NEED,      // Paradigm -> Societal_Need ("Vaccines" DRIVEN_BY_NEED "Smallpox")
+    PRECIPATED,         // Assassination of ferdinate -> world war I, stock market crash of 1929 -> great depression
+    GAVE_RISE_TO, // the blues -> jazz, prohibition -> organized crime
 
 };enum class ValidityStatus {
     CURRENT_TRUTH,      // (Germ Theory)
