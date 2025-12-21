@@ -35,14 +35,14 @@ enum class NodeCategory {
 
     // --- TIER 3: THE BUILDERS (The recursive part) ---
     // These are distinct because they are used *during* creation but don't end up inside the product.
-    TOOL_INSTRUMENT,    // "Lathe", "Oscilloscope", "Compiler", "Surface Plate"
+    //TOOL_INSTRUMENT,    // "Lathe", "Oscilloscope", "Compiler", "Surface Plate"
 
     // --- TIER 4: THE TECHNOLOGY (The What?) ---
-    COMPONENT,          // "Piston", "Transistor", "WiFi Chipset" (Parts)
-    TECH_PARADIGM,      // "Internal Combustion Engine", "Smartphone", "Internet" (The Abstract Machine)
+    //COMPONENT,          // "Piston", "Transistor", "WiFi Chipset" (Parts)
+    TECHNOLOGY,      // "Internal Combustion Engine", "Smartphone", "Internet" (The Abstract Machine)
 
     // --- TIER 5: THE INSTANCE (The Real Thing) ---
-    ARTIFACT            // "Ford Model T", "iPhone 1", "Intel 4004"
+    // ARTIFACT            // "Ford Model T", "iPhone 1", "Intel 4004"
 
 };
 
