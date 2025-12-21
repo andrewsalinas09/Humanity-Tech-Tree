@@ -247,6 +247,21 @@ struct OptimizationFactors {
     float accessibility;     // Lowers the barrier to entry
 };
 
+struct LogicGroup {
+    // 1. The "Slot" or "Role" (AND)
+    // Example: 0 = "Primary Material", 1 = "Catalyst"
+    int functional_group_id;
+
+    // 2. The "Option" (OR)
+    // Example: For Catalyst, 0 = "Platinum", 1 = "Palladium + Heat"
+    int variant_id;
+
+    // 3. The "Fragment" (AND)
+    // Example: If Variant 1 is "Palladium + Heat",
+    // Palladium is part_id 0, Heat is part_id 1.
+    int part_id;
+};
+
 // ==========================================
 // 4. THE EDGE
 // ==========================================
@@ -268,9 +283,7 @@ struct DependencyEdge {
     std::optional<DatePoint> end_date;
 
     // --- THE LOGIC (The Math) ---
-    // If empty/null: This is a MANDATORY requirement (AND).
-    // If set (0, 1, 2): This is part of an ALTERNATIVE path (OR).
-    std::optional<int> alternative_path_id;
+    LogicGroup requirement_logic;
 
     // --- THE VISUALS (The UI) ---
     // Groups edges together visually (e.g. "Inventors", "Components")
