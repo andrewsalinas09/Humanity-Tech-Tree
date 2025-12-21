@@ -212,7 +212,8 @@ struct ResourceCost {
 
 struct HistoryNode {
     // --- Identity ---
-    std::string id;             // UUID
+    std::string primary_id;             // UUID
+    std::string sub_id; // if a specific version of the node for example iPhone 16 will be 0 if its the generic version
     std::string wikidata_id;    // "Q12345"
     std::string slug;           // "steam-engine"
     
