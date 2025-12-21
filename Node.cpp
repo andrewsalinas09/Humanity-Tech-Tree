@@ -60,7 +60,7 @@ enum class EdgeType {
     MAKES_POSSIBLE,      // Physics -> Capability ("Optics" MAKES_POSSIBLE "Magnification")
     IS_COMPONENT_OF,     // Component -> Paradigm ("Lens" IS_COMPONENT_OF "Telescope")
     IS_INGREDIENT_OF,    // Material -> Component ("Glass" IS_INGREDIENT_OF "Lens")
-    OPTIMIZES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
+    SPECIFIES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
     IMPLEMENTS,          // Artifact -> Paradigm ("Hubble" IMPLEMENTS "Space Telescope")
 
     CONFORMS_TO, // IEEE 754 // should be from parent down
@@ -77,7 +77,7 @@ enum class EdgeType {
 
     // --- Intellectual Lineage ---
     INFLUENCED,       // Person -> Person ("Aristotle" INFLUENCED_BY "Plato")
-    STUDIED_AT,          // Person -> Org ("Newton" STUDIED_AT "Cambridge")
+    PLACE_OF_STUDY_FOR,          // Person -> Org ("Newton" STUDIED_AT "Cambridge")
 
     // --- The "Time Gate" ---
     KNOWLEDGE_REQUIREMENT,  // Person -> Concept ("Newton" REQUIRES_KNOWLEDGE "Algebra")
@@ -89,9 +89,9 @@ enum class EdgeType {
     // These describe how ideas change over time.
 
     // --- Transition ---
-    REPLACES,            // Paradigm -> Paradigm ("Transistor" REPLACES "Vacuum Tube")
+    REPLACED_BY,            // Paradigm -> Paradigm ("Transistor" REPLACES "Vacuum Tube")
                          // *UI Logic: Often implies the old one stops being used.*
-    SUPERSEDES,          // Law -> Law ("Relativity" SUPERSEDES "Newtonian Gravity")
+    SUPERSEDED_BY,          // Law -> Law ("Relativity" SUPERSEDES "Newtonian Gravity")
                          // *Note: The old one is still useful (Newton), but less accurate.*
 
     // --- Conflict ---
