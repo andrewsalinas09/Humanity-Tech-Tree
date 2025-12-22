@@ -57,15 +57,14 @@ enum class EdgeType {
     // ==========================================
     // These dictate if a technology works.
 
-    MAKES_POSSIBLE,      // Physics -> Capability ("Optics" MAKES_POSSIBLE "Magnification")
+    DEPENDENT_FOR,      // Physics -> Capability ("Optics" MAKES_POSSIBLE "Magnification")
     IS_COMPONENT_OF,     // Component -> Paradigm ("Lens" IS_COMPONENT_OF "Telescope")
     IS_INGREDIENT_OF,    // Material -> Component ("Glass" IS_INGREDIENT_OF "Lens")
-    SPECIFIES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
-    IMPLEMENTS,          // Artifact -> Paradigm ("Hubble" IMPLEMENTS "Space Telescope")
+    OPTIMIZES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
     IS_TYPE_OF,          // RAM -> Computer Memory, DDR -> RAM,
     IS_REFINEMENT_OF,    // DDR4 -> DDR
 
-    SPECIFIES, // IEEE 754
+    SPECIFIES_STANDARD, // IEEE 754
     // ==========================================
     // GROUP 2: THE HUMAN CONTEXT (The "Who & When")
     // ==========================================
@@ -217,12 +216,57 @@ struct ResourceCost {
 };
 
 // ==========================================
+// 5. DYNAMIC ATTRIBUTE SYSTEM (NEW)
+// ==========================================
+// Handles the "Process Modifiers" and "Infinite Attributes" logic efficiently.
+
+using AttributeID = uint32_t;
+using AttributeValue = std::variant<double, std::string, int>; // Can expand if needed
+
+// Operations for Process Nodes (How they change the material)
+enum class ModifierType {
+    SET_VALUE,      // Overwrite (e.g., Purity = 0.999)
+    ADD_VALUE,      // Accumulate (e.g., Cost += 10)
+    MULTIPLY_VALUE  // Scale (e.g., Strength *= 1.5)
+};
+
+// Comparators for Edges (How they check the material)
+enum class ConstraintOp {
+    GREATER_THAN,
+    LESS_THAN,
+    EQUAL_TO,
+    CONTAINS // For string flags
+};
+
+struct AttributeModifier {
+    AttributeID attribute_id;
+    AttributeValue value;
+    ModifierType type;
+};
+
+struct AttributeConstraint {
+    AttributeID attribute_id;
+    AttributeValue target_value;
+    ConstraintOp operation;
+};
+
+// The Registry should be a Singleton in your App Logic, used to look up IDs.
+// Including the declaration here for context.
+/*
+class AttributeRegistry {
+public:
+    AttributeID getID(const std::string& name);
+    std::string getName(AttributeID id);
+};
+*/
+
+// ==========================================
 // 3. THE NODE
 // ==========================================
 
 struct HistoryNode {
     // --- Identity ---
-    std::string primary_id;             // UUID
+    std::string primary_id;             // UUID Instead of having iphone 16 be a shub id to iphone it will simply be a child node with edge refins etc...
     std::string wikidata_id;    // "Q12345"
     std::string slug;           // "steam-engine"
 
@@ -247,6 +291,9 @@ struct HistoryNode {
     // --- Content ---
     std::string wiki_summary;
     std::string image_url;
+
+std::unordered_map<AttributeID, AttributeValue> base_attributes;
+std::unordered_map<std::string, std::vector<AttributeModifier>> process_output_effects;
 };
 
 struct OptimizationFactors {
@@ -303,6 +350,8 @@ struct DependencyEdge {
 
     // --- THE LOGIC (The Math) ---
     LogicGroup requirement_logic;
+
+    std::vector<AttributeConstraint> constraints;
 
     // --- THE VISUALS (The UI) ---
     // Groups edges together visually (e.g. "Inventors", "Components")
