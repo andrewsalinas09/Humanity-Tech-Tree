@@ -1,6 +1,6 @@
 # ADR-0010: Neo4j stores the graph; a C++ solver owns the logic
 
-- **Status:** Accepted
+- **Status:** Superseded in part by ADR-0031 (Neo4j replaced by Postgres-first; the fat-query → in-memory-solver split is reaffirmed and survives)
 - **Date:** ~2026-01
 - **Source:** long-chat digest
 
