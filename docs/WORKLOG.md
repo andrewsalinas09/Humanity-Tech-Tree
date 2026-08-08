@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (night) — ADR-0019: inheritance + exclusion overrides (TB-034)
+**Done:** User's edge case (per-iPhone WiFi versions; an instance lacking a family feature; Sony vs Canon sensors) split into: already-solved (per-instance specificity = ADR-0008/0018) and a real gap — absence. ADR-0019 accepted: family edges are inheritable defaults; instances WIDEN (subsumes ADR-0008's RequirementOverride) or EXCLUDE with justification; inherited-unasserted facts are labeled *presumptions* (keeps ADR-0015 intact); contiguous gaps use dated edges (front camera from 2010), scattered gaps use exclusions. Documented the NOT-vs-EXCLUDE trap (requires-absence ≠ does-not-inherit). Node.cpp: InheritanceOverride struct + field. TB-034 added and Solved. Glossary: exclusion override, presumption.
+**Learned:** Real history improved the test case: iPhone 1 HAD a rear camera; the front camera (iPhone 4, 2010) is the true dated-edge example.
+**Next:** Q-02 (truth-system overlap) — now four truth-adjacent mechanisms to reconcile (validity, epistemic, date uncertainty, presumption).
+
 ## 2026-08-09 (evening) — Q-18 resolved: version families via worked 802.11 example
 **Done:** Wrote `docs/examples/802-11-worked-example.md` — full real-history 802.11 walkthrough (family root deps incl. FCC ISM deregulation as LEGISLATION; significance-gated version nodes b/a/g/i/n/ac/ax/be with the new dependency earning each; d/e/h/j as iteration records; TSF attaching to the root since 1997; consumer linking rules; TB-033 counterfactual; Thunderbolt/DDR/CPU-fan-out generalization). ADR-0018 accepted: flat significance-gated version stars (never chained — inheritance stays clean), truth-granular feature attachment, record→edge lifting, no nested sub-graphs in storage (family bubble = zoom rendering), fan-out as consumer-edge constraints + capability routers. TB-006/013/014/015/033 → Solved. Q-18 → Resolved. New glossary terms: family root, lifting.
 **Learned:** Thunderbolt 4 is the filter's best proof case — a marketing/certification increment that correctly gets an iteration record, not a node. Misjudged node-worthiness is structurally safe in both directions (create-later + lift, or merge + redirect).

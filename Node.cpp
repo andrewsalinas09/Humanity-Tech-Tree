@@ -272,6 +272,19 @@ struct RequirementExpr {
     std::vector<RequirementExpr> children;  // when op != EDGE
 };
 
+// ADR-0019: instance-level overrides of inherited family edges.
+// Family edges are inheritable defaults; instances may WIDEN (relax the
+// requirement to the LCA, per ADR-0008) or EXCLUDE (the default does not
+// apply here). NOTE: EXCLUDE is "does not inherit", which is NOT the same
+// as RequirementExpr NOT ("requires the absence of").
+struct InheritanceOverride {
+    std::string family_edge_id;
+    enum class Kind { WIDEN_TO_LCA, EXCLUDE };
+    Kind kind;
+    std::string relaxed_target_id;  // WIDEN_TO_LCA only
+    std::string justification;
+};
+
 // ==========================================
 // 3. THE NODE
 // ==========================================
@@ -310,6 +323,11 @@ std::unordered_map<std::string, std::vector<AttributeModifier>> process_output_e
     // ADR-0017: boolean expression tree over incoming dependency edges.
     // std::nullopt = AND of all hard dependency edges (the common case).
     std::optional<RequirementExpr> requirement_expr;
+
+    // ADR-0019: this instance's deviations from inherited family edges.
+    // Effective deps = own edges + inherited edges - exclusions, widenings applied.
+    // Inherited-but-unasserted facts are PRESUMPTIONS (render distinctly).
+    std::vector<InheritanceOverride> inheritance_overrides;
 };
 
 struct OptimizationFactors {

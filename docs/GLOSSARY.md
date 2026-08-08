@@ -17,6 +17,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Dependency mass / weight** — how many nodes transitively depend on a node; determines its protection level.
 - **DigiKey problem** — the node-explosion that results from modeling every part variant as a node; solved by attributes (ADR-0004).
 - **Epistemic status** — confidence a claim is true: mainstream fact → high confidence → debated → uncertain origin → fringe theory → mythology. Orthogonal to validity.
+- **Exclusion override** — an instance's declaration that an inherited family edge does not apply to it ("no front camera"), with justification; NOT the same as logical NOT, which means "requires absence" (ADR-0019).
 - **Family root** — the node holding everything true of a versioned family as a whole (802.11, Thunderbolt): shared dependencies, family-wide mechanisms, iteration records, marketing aliases. Version nodes attach in a flat star (ADR-0018).
 - **Gatekeeper node** — a categorical chokepoint (Integrated Circuit, High-Pressure Vessel) that encodes an era boundary topologically: vacuum tubes can make a CPU but never an IC.
 - **Ghost edges** — context/human-layer edges hidden by default rendering; History Mode fades them in.
@@ -32,6 +33,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Manufacturing Test** — split into a new node only when BOM/physics/supply chain changes; otherwise it's an attribute.
 - **Modifier Stack** — solver-composed virtual material instance: base attributes + stacked optimizer processes, checked against consumer constraints.
 - **Optimization edge/path** — an edge that improves attributes rather than enabling existence; how specific requirements are satisfied and bootstrap loops terminate.
+- **Presumption** — an instance-level fact derived only from an inherited family edge, not asserted at the instance; rendered distinctly, so unrecorded exceptions are labeled incompleteness rather than false assertions (ADR-0019).
 - **ProductIteration** — a data record (not node) for minor versions inside a series-root node (iPhone 3G inside "iPhone").
 - **Re-parenting** — inserting a node between a parent and its children, triggering the check queue.
 - **Reverse recipe search** — compositional search: give ingredients {WiFi, Touchscreen, Cellular}, intersect used-by sets, get Smartphone.
