@@ -52,60 +52,38 @@ enum class NodeCategory {
 };
 
 enum class EdgeType {
-    // ==========================================
-    // GROUP 1: THE HARD TECH TREE (The "Must Haves")
-    // ==========================================
-    // These dictate if a technology works.
+    // THE ORTHOGONAL BASIS (ADR-0024/0028). Types are the traversal partition
+    // key: a type exists only if a traverser at a high-fan-out node needs it
+    // to prune, or a machine consumer treats it differently. ALL flavor lives
+    // in DependencyEdge::qualifier. Adding a type requires an ADR proving a
+    // new pruning need or machine behavior. Legacy->basis mapping: ADR-0028.
 
-    DEPENDENT_FOR,      // Physics -> Capability ("Optics" MAKES_POSSIBLE "Magnification")
-    IS_COMPONENT_OF,     // Component -> Paradigm ("Lens" IS_COMPONENT_OF "Telescope")
-    IS_INGREDIENT_OF,    // Material -> Component ("Glass" IS_INGREDIENT_OF "Lens")
-    OPTIMIZES,           // Tool -> Method ("Lathe" OPTIMIZES "Turning")
-    IS_TYPE_OF,          // RAM -> Computer Memory, DDR -> RAM,
-    IS_REFINEMENT_OF,    // DDR4 -> DDR
+    ENABLES,           // Existence dependency; possibility traversal.
+                       // Counterfactual mode masks works/people (ADR-0025).
+                       // Absorbs DEPENDENT_FOR, SPECIFIES_STANDARD (target
+                       // category prunes), KNOWLEDGE_REQUIREMENT (linter:
+                       // BIOLOGICAL_ENTITY only receives knowledge ENABLES).
 
-    SPECIFIES_STANDARD, // IEEE 754
-    // ==========================================
-    // GROUP 2: THE HUMAN CONTEXT (The "Who & When")
-    // ==========================================
-    // These connect People to the Tree.
+    IS_COMPONENT_OF,   // Assembled part ("Lens" -> "Telescope"); BOM counting.
+    IS_INGREDIENT_OF,  // Consumed/transformed input ("Glass" -> "Lens").
+                       // Distinct from component: "made from" vs "contains"
+                       // are different constantly-asked questions (DuPont).
 
-    // --- Origin Stories ---
-    AUTHORED,            // Person -> Work ("Newton" AUTHORED "Principia")
-    DISCOVERED,          // Person -> Natural_Law ("Archimedes" DISCOVERED "Buoyancy")
-                         // *Use this if they didn't write a specific book, or as a shorthand.*
-    INVENTED,            // Person -> Tech_Paradigm ("Bell" INVENTED "Telephone")
+    IS_TYPE_OF,        // Classification; inheritance flows down (ADR-0019).
+    IS_REFINEMENT_OF,  // Version/generation walks; flat stars (ADR-0018).
 
-    // --- Intellectual Lineage ---
-    INFLUENCED,       // Person -> Person ("Aristotle" INFLUENCED_BY "Plato")
-    PLACE_OF_STUDY_FOR,          // Person -> Org ("Newton" STUDIED_AT "Cambridge")
+    OPTIMIZES,         // Improves attributes; existence dead-end (ADR-0006).
 
-    // --- The "Time Gate" ---
-    KNOWLEDGE_REQUIREMENT,  // Person -> Concept ("Newton" REQUIRES_KNOWLEDGE "Algebra")
-                         // *Validation Rule: A Person cannot exist before their required knowledge.*
+    SUCCEEDS,          // Dated succession story; timeline-wave rendering.
+                       // qualifier: replaced, superseded, spun-off,
+                       // rebranded, forked, merged.
 
-    // ==========================================
-    // GROUP 3: EVOLUTION & CONFLICT (The "Story")
-    // ==========================================
-    // These describe how ideas change over time.
-
-    // --- Transition ---
-    REPLACED_BY,            // Paradigm -> Paradigm ("Transistor" REPLACES "Vacuum Tube")
-                         // *UI Logic: Often implies the old one stops being used.*
-    SUPERSEDED_BY,          // Law -> Law ("Relativity" SUPERSEDES "Newtonian Gravity")
-                         // *Note: The old one is still useful (Newton), but less accurate.*
-
-    // --- Conflict ---
-    DISPROVED_BY,           // Concept -> Belief ("Germ Theory" DISPROVES "Miasma")
-    INHIBITS,            // Belief -> Concept ("Geocentrism" INHIBITS "Astronomy")
-
-    // --- Motivation ---
-    MOTIVATED_BY,        // Concept -> Concept ("Chemistry" MOTIVATED_BY "Alchemy")
-                         // *Use when the predecessor was "wrong" but led to the right path.*
-    DRIVES_NEED_FOR,      // Paradigm -> Societal_Need ("Vaccines" DRIVEN_BY_NEED "Smallpox")
-    PRECIPITATED,         // Assassination of ferdinate -> world war I, stock market crash of 1929 -> great depression
-    GAVE_RISE_TO, // the blues -> jazz, prohibition -> organized crime
-
+    ASSOCIATION,       // Story/attribution ghost layer; solver-invisible.
+                       // qualifier: authored, discovered, invented, founded,
+                       // influenced, studied-at, disproved, suppresses,
+                       // motivated, drives-need, precipitated, gave-rise-to,
+                       // funded, codifies, custody, brand-applies, ...
+                       // Split later by qualifier if profiling demands it.
 };enum class ValidityStatus {
     CURRENT_TRUTH,      // (Germ Theory)
     DISPROVEN,          // (Phlogiston)
@@ -360,6 +338,15 @@ struct DependencyEdge {
     std::string to_node_id;
 
     EdgeType type;
+    // ADR-0024: the flavor slug ("spun-off", "authored", "drives-need"...).
+    // Carries all meaning that never needs to prune a traversal.
+    // LLM-canonicalized like attribute names; secondary-indexed for search.
+    std::string qualifier;
+
+    // ADR-0027: two orthogonal truth axes. Validity = is the claim's content
+    // held true today; Epistemic = how confident are we the record is
+    // accurate. Phlogiston edges: well-documented (epistemic) AND disproven
+    // (validity) — mergeable into neither single scale.
     EpistemicStatus truth_level;
     ValidityStatus validity;
     ResourceCost base_cost; // Aluminum will have edges to multiple things, each will have different costs.

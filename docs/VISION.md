@@ -17,5 +17,6 @@ This project was impossible before LLMs. The graph needs millions of judgment ca
 ## What this is not
 
 - Not a taxonomy or encyclopedia — Wikipedia has articles; this has *dependencies*.
+- Not a general history database — **the tech tree is first-class**; events, people, and organizations enter only where they shape technology (WWII is here because of radar and rocketry, not for its own sake).
 - Not a curated expert-only database — the moderation design exists precisely so it can be open.
 - Not required to be perfect — "let true things be true and it's ok if it's not perfect." Constraints and community flags converge it toward accuracy over time.
