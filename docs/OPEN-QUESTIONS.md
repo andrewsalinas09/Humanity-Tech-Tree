@@ -52,7 +52,10 @@ LOD 0 simulation layer vs. LOD 1 blueprint layer (sim never traverses LOD 1), `i
 ## Q-16: Language/runtime commitment
 C++ solver is decided (ADR-0010), but nothing is said about the API server layer between Neo4j/solver and the web, nor build system, nor how the C++ solver is exposed (service? WASM? embedded?).
 
-## Q-17: Storage engine at real scale — decision reopened; research ACTIVE (2026-08-10)
+## Q-17: Storage engine — **Resolved → ADR-0031** (Postgres-first, ratified 2026-08-10)
+Research synthesis in `docs/research/2026-08-backend-synthesis.md`; deep-traversal concern addressed in ADR-0031's Traversal Analysis (skeleton-in-RAM + partition-pruned extraction + snapshot analytics); watch list with migration triggers retained. Original framing below for history:
+
+### (historical) Q-17 framing — research ACTIVE (2026-08-10)
 ADR-0010's Neo4j choice came from an older-generation LLM conversation and predates both the scale estimate and the agent-first ruling (ADR-0029). Requirements matrix derived from the ADRs — candidates are scored against ALL of these:
 
 - **R1 Scale path:** billions of nodes/edges, TB-scale payloads eventually; but must start tiny and cheap (Phase 2) with a credible growth path — no day-one cluster.

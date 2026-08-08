@@ -1,6 +1,6 @@
 # ADR-0031: Postgres-first backend; branching and versioning are application-level
 
-- **Status:** PROPOSED — awaiting user ratification
+- **Status:** Accepted (ratified by user 2026-08-10; deep-traversal concern raised and addressed — see Traversal Analysis below)
 - **Date:** 2026-08-10
 - **Source:** three-stream research synthesis (`docs/research/2026-08-backend-synthesis.md`); supersedes the storage half of ADR-0010 (the in-memory-solver split survives)
 
@@ -16,6 +16,12 @@ ADR-0010 chose Neo4j in the old-LLM era, before the requirements matrix (Q-17) a
 
 ## Why
 Postgres is where the unavoidable app-level layer is cheapest and most transactional; MVCC handles agent-swarm write concurrency better than single-leader graph engines; operational knowledge is universal; licensing is permanently safe; and starting tiny is free. The things a dedicated graph engine would add (native deep traversal) are exactly the things the architecture doesn't need from the store. Choosing boring, revenue-independent infrastructure after a year in which three fashionable graph engines died or relicensed is the R9 lesson applied.
+
+## Traversal Analysis (the ratification concern: "solver and search are deep graph traversal")
+1. **The skeleton fits in RAM.** Deep traversal needs only `(from_id, to_id, type)` — packed CSR arrays put 1B edges at ~8–16GB: the full causal skeleton of the graph in one server's memory, traversed at 100M+ edges/sec. The store holds the heavy payloads (TBs of descriptions/citations/versions); the solver holds the skeleton. Postgres never traverses.
+2. **Targeted extraction:** app-driven frontier expansion — one indexed batch lookup per hop, physically pruned by the 8-type edge partitions (existence traversal never touches the story-layer partition). A 50-hop ancestor closure is ~50 millisecond-class queries; the working set fits solver memory. The SQL graph-killer (one unbounded recursive join) is never issued.
+3. **Whole-graph analytics** (global impact analysis, transitive-reduction linting) run over periodic skeleton snapshots in memory (embedded engine like LadybugDB is a candidate substrate). **Search is not traversal:** semantic = ANN (pgvector → sidecar), reverse-recipe = set intersection, filters = B-trees.
+4. **Escape hatches stand:** the JSONL fact log makes Neo4j/FlureeDB adoption a migration, not a rewrite; triggers in the synthesis watch list.
 
 ## Consequences
 - ADR-0010 marked superseded-in-part (Neo4j choice); the fat-query/in-memory-solver pattern is reaffirmed.
