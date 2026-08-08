@@ -17,6 +17,8 @@ Abstraction is **lazy** (ADR-0008): link to the most specific true leaf; create 
 
 Node creation is gated by the six-rule **Significance Filter** (ADR-0009); minor versions live as `ProductIteration` data inside a series-root node, not as nodes.
 
+**Version families** (ADR-0018, worked example in `docs/examples/802-11-worked-example.md`): a family root holds family-wide truth; significance-gated version nodes attach in a flat star (`IS_REFINEMENT_OF → root`, never chained — succession is dated story edges); features attach at the granularity where they're true and *lift* from iteration records to edges as versions earn nodes. No nested sub-graphs in storage — the family "bubble" is zoom/LOD rendering.
+
 ### Nodes (`HistoryNode`)
 - **Identity:** UUID, optional `wikidata_id`, `slug`, `name` + `aliases` (aliases power search-first dedup).
 - **Category** (`NodeCategory`): biological entity → … → technology. TOOL/COMPONENT/ARTIFACT are deliberately collapsed into TECHNOLOGY — "everything is a technology unless absolutely necessary."

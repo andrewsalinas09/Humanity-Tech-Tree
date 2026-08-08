@@ -32,7 +32,7 @@ Independent discovery must not create two Calculus nodes or make either person a
 
 ### TB-006 — GoPro 12 drops GPS; 1–11 and 13+ have it
 A feature present, removed, restored across iterations of one product line.
-**Stresses:** iteration-level dependency changes. **Answer (partial):** ADR-0009 — iterations are data records with per-iteration tech links, so GPS presence is iteration data; multiple dated edges cover node-level lapses. **Gap:** is "which GoPros have GPS?" queryable if the info lives in iteration records rather than edges? **Status:** Partial.
+**Stresses:** iteration-level dependency changes. **Answer:** ADR-0009 + ADR-0018 §4 — GPS presence attaches at truth-granularity: iteration-record data for record-only versions, edges to any iteration that has a node, with record→edge lifting. Queryability: iteration records are structured data on the series root, so "which GoPros have GPS?" scans one node's records — acceptable. **Status:** Solved (design).
 
 ### TB-007 — Trinity test sorts before Hiroshima
 Both 1945; ordering matters for causality rendering.
@@ -62,15 +62,15 @@ Near-identical iterations must NOT get nodes; an iteration with a genuinely new 
 
 ### TB-013 — One CPU node, hundreds of divergent branches
 We refuse per-SKU CPU nodes, yet "CPU" must fan out along many independent axes — speed, size, power, architecture, era — to different consumers with different needs.
-**Stresses:** whether attributes + capability edges + refinement chains can carry hundreds of distinct fan-outs from one node without either node explosion or mush. **Answer:** unproven combination of ADR-0004 (attributes), capability router nodes, and IS_REFINEMENT_OF chains. **Status:** OPEN (Q-18) — needs a worked example at real density.
+**Stresses:** whether attributes + capability edges + refinement chains can carry hundreds of distinct fan-outs from one node without either node explosion or mush. **Answer:** ADR-0018 §7 — diversity lives on consumer edges (constraints), recurring profiles bundle into capability routers, architectures are refinement children; growth is linear + sublinear. Worked in `docs/examples/802-11-worked-example.md` §5. **Status:** Solved (design) — Phase 2 seed corridor must confirm at real density.
 
 ### TB-014 — Adding 802.11 TSF
 The user rabbit-holes into WiFi and wants to add TSF (Timing Synchronization Function). Where does it go? What about 802.11b/g/n/ax?
-**Stresses:** standard families, sub-mechanisms of standards, incremental authoring. **Proposed:** 802.11 family root; version nodes only where new dependencies appear (a/g ← OFDM, n ← MIMO, ax ← OFDMA — consistent with ADR-0009); TSF as a METHOD_TECHNIQUE node, component of the 802.11 MAC, dated to its introducing version; consumers link to the family unless they truly require a version. **Status:** OPEN (Q-18) — pattern proposed, unvalidated.
+**Stresses:** standard families, sub-mechanisms of standards, incremental authoring. **Answer:** ADR-0018, fully worked in `docs/examples/802-11-worked-example.md` — TSF is family-wide since 1997 so it attaches to the root (one node, one edge); version nodes are significance-gated (n ← MIMO, ax ← OFDMA); flat star, not a chain. **Status:** Solved (design).
 
 ### TB-015 — Thunderbolt 5 → 4 → 3
 A refinement chain where consumers usually care about the family, sometimes about a version (TB3 ← USB-C connector; TB5 ← PAM-3 signaling).
-**Stresses:** same as TB-014 from the consumer side: when do existing consumer edges migrate to a new version (re-parenting queue, Q-04)? **Status:** OPEN (Q-18).
+**Stresses:** same as TB-014 from the consumer side: when do existing consumer edges migrate to a new version (re-parenting queue, Q-04)? **Answer:** ADR-0018 §5 — nothing migrates by default (family links stay true); the check queue only *suggests* repointing where the new version is a consumer's more specific truth. TB4 is the filter's proof case: a marketing/certification increment gets an iteration record, not a node. **Status:** Solved (design).
 
 ### TB-016 — Betamax
 A losing branch that must exist (dead ends are educational) without polluting the winner's lineage.
@@ -146,4 +146,4 @@ A contributor needs a parent node and must learn in seconds whether it exists, u
 
 ### TB-033 — WiFi 1–4 lack TSF, 5–8 have it (hypothetical)
 Feature presence varying — possibly non-contiguously — across a version family. The GoPro problem (TB-006) wearing a standards hat; one mechanism must solve both.
-**Stresses:** version-scoped feature attachment; "graph inside a node" intuition. **Proposed:** feature presence attaches at whatever granularity exists — IS_COMPONENT_OF edges to version *nodes* where they exist, iteration-record data where they don't, lifting record→edge when a version node is later created (incomplete → refined, never wrong). The "inner graph" of a family is ordinary scoped nodes/edges collapsed into the family bubble by zoom/LOD rendering — a viewer behavior, not a storage mechanism. **Status:** OPEN (Q-18, with TB-006).
+**Stresses:** version-scoped feature attachment; "graph inside a node" intuition. **Answer:** ADR-0018 §4/§6 — feature presence attaches at truth-granularity (edges to exactly the version nodes that have it; iteration-record data below node granularity; record→edge lifting as a monotone resolution increase). No nested sub-graphs in storage; the family bubble is zoom/LOD rendering. Also closes TB-006's queryability gap. **Status:** Solved (design).

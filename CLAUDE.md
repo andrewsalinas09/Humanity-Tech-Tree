@@ -16,6 +16,7 @@ A knowledge graph of all human technology and culture. Nodes are things (technol
 | `docs/decisions/` | One ADR per settled decision, with the *why* | Before proposing any design change |
 | `docs/OPEN-QUESTIONS.md` | Unresolved debates, each with an ID and status | Before designing anything new |
 | `docs/TESTBED.md` | Every known edge case (TB-IDs); the design acceptance suite | Before AND after any design change |
+| `docs/examples/` | Worked examples validating design patterns (802.11 etc.) | When applying or testing a pattern |
 | `docs/ROADMAP.md` | Phases and **current focus** | Starting any session |
 | `docs/WORKLOG.md` | Append-only session journal | Resuming after a gap |
 | `docs/archive/` | Original raw notes, verbatim | Almost never (history only) |

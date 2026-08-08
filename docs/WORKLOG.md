@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (evening) — Q-18 resolved: version families via worked 802.11 example
+**Done:** Wrote `docs/examples/802-11-worked-example.md` — full real-history 802.11 walkthrough (family root deps incl. FCC ISM deregulation as LEGISLATION; significance-gated version nodes b/a/g/i/n/ac/ax/be with the new dependency earning each; d/e/h/j as iteration records; TSF attaching to the root since 1997; consumer linking rules; TB-033 counterfactual; Thunderbolt/DDR/CPU-fan-out generalization). ADR-0018 accepted: flat significance-gated version stars (never chained — inheritance stays clean), truth-granular feature attachment, record→edge lifting, no nested sub-graphs in storage (family bubble = zoom rendering), fan-out as consumer-edge constraints + capability routers. TB-006/013/014/015/033 → Solved. Q-18 → Resolved. New glossary terms: family root, lifting.
+**Learned:** Thunderbolt 4 is the filter's best proof case — a marketing/certification increment that correctly gets an iteration record, not a node. Misjudged node-worthiness is structurally safe in both directions (create-later + lift, or merge + redirect).
+**Next:** Q-02 (truth-system overlap: ValidityStatus vs EpistemicStatus vs date uncertainty), then EdgeType enum reconciliation; Phase 2 seed corridor must include Microprocessor at real density (TB-013 empirical check).
+
 ## 2026-08-09 (later still) — Q-01 resolved: requirement logic is a boolean expression tree
 **Done:** ADR-0017 accepted (user approved AND/OR/NOT tree, trusting judgment on details): expression tree lives on the consumer node with edge-ID leaves; absent tree = AND of all hard edges; NOT included but editorially discouraged (breaks monotonicity that makes incomplete graphs safe); LogicGroup and alternative_path_id both retired. Node.cpp updated (LogicGroup → RequirementExpr, moved before HistoryNode; edge logic field removed). TB-021 → Solved. Q-01 → Resolved. ARCHITECTURE/GLOSSARY/ROADMAP updated.
 **Learned:** The wizard's "alternative or additional?" prompt (ADR-0012 Componentize) is the authoring-side guard that keeps the all-AND default honest.

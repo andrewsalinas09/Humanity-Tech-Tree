@@ -17,6 +17,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Dependency mass / weight** — how many nodes transitively depend on a node; determines its protection level.
 - **DigiKey problem** — the node-explosion that results from modeling every part variant as a node; solved by attributes (ADR-0004).
 - **Epistemic status** — confidence a claim is true: mainstream fact → high confidence → debated → uncertain origin → fringe theory → mythology. Orthogonal to validity.
+- **Family root** — the node holding everything true of a versioned family as a whole (802.11, Thunderbolt): shared dependencies, family-wide mechanisms, iteration records, marketing aliases. Version nodes attach in a flat star (ADR-0018).
 - **Gatekeeper node** — a categorical chokepoint (Integrated Circuit, High-Pressure Vessel) that encodes an era boundary topologically: vacuum tubes can make a CPU but never an IC.
 - **Ghost edges** — context/human-layer edges hidden by default rendering; History Mode fades them in.
 - **God Mode** — the internal debugger UI/tracer tooling built before any public UI (ADR-0014).
@@ -26,6 +27,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Lazy abstraction** — link to the most specific true leaf; create abstract parents only when a second implementation forces it.
 - **Lazy Split** — when unsure node-vs-attribute, start as attribute: splitting later is easy, merging nodes is hard.
 - **LCA / widening** — handling exceptions by relaxing a requirement to the Least Common Ancestor (recorded as a RequirementOverride), never deleting it.
+- **Lifting** — promoting iteration-record data into real nodes/edges when a version earns a node; a monotone resolution increase, never a correction (ADR-0018).
 - **Requirement expression** — the boolean expression tree (AND/OR/NOT over edge leaves) on a consumer node defining how its dependencies combine; absent tree = AND of all hard edges (ADR-0017). Replaced the old "logic group" integer-ID designs.
 - **Manufacturing Test** — split into a new node only when BOM/physics/supply chain changes; otherwise it's an attribute.
 - **Modifier Stack** — solver-composed virtual material instance: base attributes + stacked optimizer processes, checked against consumer constraints.
