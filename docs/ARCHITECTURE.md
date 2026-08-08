@@ -8,7 +8,7 @@ Two simultaneous structures, both made of edges:
 - the **dependency graph** (horizontal, causal: MAKES_POSSIBLE / IS_COMPONENT_OF / IS_INGREDIENT_OF / OPTIMIZES…)
 - the **taxonomy tree** (vertical: IS_TYPE_OF / IS_REFINEMENT_OF)
 
-Edges flow **provider → consumer** (past → future), never `REQUIRES_*` — one arrow direction keeps traversal and timeline rendering unambiguous.
+Edges flow **provider → consumer** (past → future), never `REQUIRES_*` — one arrow direction keeps traversal and timeline rendering unambiguous. Direction is *meaning*, not access: every edge is indexed and navigable both ways, and the graph is **insertion-order independent** — contributors can build any chain from either end or the middle and converge to the same state (ADR-0023).
 
 ### Abstraction layers
 Concept ("Car", the interface) / Paradigm ("Internal Combustion Automobile", the abstract class) / Artifact ("Benz Patent-Motorwagen", the instance). **Capability nodes** ("High-Speed Logic Switching", "True Flatness") act as routers between physics and engineering so Transistor doesn't need edges to every gadget ever built.

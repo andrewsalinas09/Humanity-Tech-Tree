@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (cont.) — ADR-0023: bidirectional navigation + insertion-order independence (TB-037)
+**Done:** User's requirement ("Nokia to paper mill, paper mill to phone, add it anywhere and not be wrong") formalized as ADR-0023: (1) direction is meaning not access — every edge indexed/navigable both ways; (2) insertion-order independence pinned as an invariant — any order of true additions converges to the same graph (already implied by stubs/lazy abstraction/additive specialization/lifting; now a promise no future mechanism may break, and a TESTBED-level acceptance criterion); (3) mid-chain duplicate meets heal via search-first + merge redirects — convergence defined up to merges; (4) becomes an executable permutation-test fixture once code exists. TB-037 Solved. ARCHITECTURE updated.
+**Learned:** Order-independence was a lucky consequence of existing decisions; naming it converts it into a design constraint like the prime directive.
+**Next:** Q-02 (truth systems), then EdgeType reconciliation (APPLIES_TO and friends waiting).
+
 ## 2026-08-09 (cont.) — ADR-0022: identity is the causal chain (TB-036, product morphing)
 **Done:** User's exercise: verify the arch survives every way a product can morph, incl. Ship of Theseus + rebrand. Worked example `docs/examples/product-morphing-worked-example.md` (Mustang gens 1-7 → Mach-E brand transplant; Twitter→X; Nokia pivots; Polaroid zombie brand; LibreOffice fork; category drift — 7-type mutation taxonomy, all resolving into existing machinery). ADR-0022 accepted: no stored "sameness" — identity is displayed as the dated causal chain; `name_history` (dated names, lazy) added to Node.cpp; brands promote to Brand nodes only on transplant (dated APPLIES_TO edges; never IS_REFINEMENT_OF across a brand jump); family roots may legally degrade into pure identity containers. TB-036 Solved. Glossary: Brand node, identity container.
 **Learned:** The trap was ever answering "is it the same thing?" — any stored sameness flag would eventually be wrong (ADR-0015); chains of dated facts cannot be. APPLIES_TO joins the edge-vocabulary backlog for the EdgeType reconciliation pass.
