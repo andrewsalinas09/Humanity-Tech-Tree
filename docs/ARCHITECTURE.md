@@ -22,7 +22,7 @@ Node creation is gated by the six-rule **Significance Filter** (ADR-0009); minor
 ### Nodes (`HistoryNode`)
 - **Identity:** UUID, optional `wikidata_id`, `slug`, `name` + `aliases` (aliases power search-first dedup).
 - **Category** (`NodeCategory`): biological entity → … → technology. TOOL/COMPONENT/ARTIFACT are deliberately collapsed into TECHNOLOGY — "everything is a technology unless absolutely necessary."
-- **State:** LOCKED / THEORETICAL / REALIZED is **computed** from (Time + Location + Node) — ADR-0002. The struct's `current_state` is a vestigial cache for abstract-node realization only.
+- **State:** LOCKED / THEORETICAL / REALIZED is **computed** from (Time + Location + Node) — ADR-0002/0026; no state fields are stored (audit complete 2026-08-09). TB-041 rule: the parentless magic-box-REALIZED default applies only to validity=current_truth nodes — hypothetical validity blocks realization regardless of parents, so hypothetical leaves (room-temp superconductor) keep their pre-built child trees locked until the physics lands.
 - **Regional availability:** per-region `Timeline` of `TimeSegment`s (KnowledgeStatus: active/theoretical/lost/obsolete/mythical + `transition_reason_slug`), `is_indigenous`, `import_source`, per-claim citations. Models lost knowledge (Roman concrete) and multi-origin tech (gunpowder); the anti-Eurocentrism mechanism.
 - **Attributes:** `base_attributes` (AttributeID → variant value, interned via `AttributeRegistry`); process nodes carry `AttributeModifier`s (SET/ADD/MULTIPLY). See §3.
 
@@ -64,6 +64,8 @@ People connect via WORK_PUBLICATION nodes (ADR-0007); possibility checks ignore 
 - First-principles derivation: full dependency chain of X down to natural law.
 - "Can I build a Musket in Europe in 1300?" — earliest-possible-date = MAX over hard deps, intersected with regional timelines.
 - Counterfactuals: "Could Rome have had steam engines?" — possibility propagates ONLY through necessary dependencies (concepts/capabilities/materials/techniques), never through works or people, and returns a gap list (ADR-0025). Actual dates and possible dates are separate computations.
+- Conditional knowledge: "which theorems are children of RH?" — conditionality is computed (does any proof path in the requirement expression avoid hypothetical nodes?); impact analysis on conjectures; unlock cascades from hypothetical leaves (TB-041).
+- Invention prospecting: "what would X depend on in theory?" — the counterfactual harness pointed at the future; gap list → invent → add facts → unlock.
 - Compositional "reverse recipe" search: {WiFi, Touchscreen, Cellular} → Smartphone (inverted index + intersection).
 - Impact analysis: kill a node, watch dependents die.
 - "How was X first made" (skip optimizers) vs. "how is X made well" (traverse them).

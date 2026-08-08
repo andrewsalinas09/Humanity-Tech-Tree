@@ -285,8 +285,12 @@ struct HistoryNode {
     ValidityStatus validity;
 
 
-    NodeState current_state = NodeState::REALIZED;
-    int active_instance_count = 0;
+    // Node state (LOCKED/THEORETICAL/REALIZED) and instance counts are
+    // ENTAILMENTS — computed per (time, region) query, never stored
+    // (ADR-0002/0026). The NodeState enum above is the solver's output
+    // vocabulary. Rule from TB-041: the parentless-node "magic box = REALIZED"
+    // default applies only when validity == CURRENT_TRUTH; HYPOTHETICAL
+    // validity blocks realization regardless of parents (no false unlocks).
 
 
     // --- Simulation Properties ---
