@@ -367,6 +367,11 @@ struct DependencyEdge {
 
     // Requirement logic lives on the consumer node (ADR-0017), not on edges.
 
+    // ADR-0021: finer edges that fully cover this edge's claim. Empty = live.
+    // Shadowed edges stay true; counting/BOM queries skip them, truth queries
+    // don't. Re-validated whenever a covering edge changes.
+    std::vector<std::string> shadowed_by_edge_ids;
+
     std::vector<AttributeConstraint> constraints;
 
     // --- THE VISUALS (The UI) ---

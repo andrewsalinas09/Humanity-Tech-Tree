@@ -25,6 +25,6 @@ Focal length, aperture, sensor size: attributes on the module/edges (ADR-0004, L
 
 **Uneven resolution is normal and permanent.** A dashcam keeps its generic `Camera IS_COMPONENT_OF Dashcam` edge forever; iPhone gets the full tree because contributors care. Both are correct indefinitely. Depth is opt-in per node, demand-driven; the architecture's only obligation is to make arbitrary depth *possible* everywhere (roles + attributes + sub-families + iteration records already suffice).
 
-## Honest caveat → Q-06
+## The generic edge's exact fate (ADR-0021)
 
-When a generic edge coexists with its specializations, component-counting queries must not double-count (generic "camera" + front + rear ≠ three cameras). This case is now the motivating example for the shadowing/subsumption decision (Q-06, TB-025).
+When both sub-role edges exist and fully cover it, the original `Camera → iPhone` edge is marked `shadowed_by: [front_edge, rear_edge]` — untouched otherwise. Counting/BOM queries skip it (iPhone 4 has two cameras, not three); truth queries and zoomed-out rendering still use it ("does iPhone have a camera?" needs no taxonomy walk). If a covering edge is ever date-bounded or excluded so coverage no longer holds, the shadow re-validates and the generic edge resurfaces as the truth carrier. If the Rear role is deferred (lazy), the generic edge simply stays live doing rear-camera duty at low resolution until someone specializes it.

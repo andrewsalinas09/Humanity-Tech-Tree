@@ -114,7 +114,7 @@ Re-parenting: which of Battery's component edges should move to LiIon?
 
 ### TB-025 — iPhone→Lithium after iPhone→Battery→Lithium exists
 A true-but-now-redundant zoomed-out edge must not double-count in BOMs or clutter rendering.
-**Stresses:** transitive redundancy. **Answer:** shadowing/subsumption vs. transitive-reduction jobs vs. proxy redirects — unchosen. **Status:** OPEN (Q-06).
+**Stresses:** transitive redundancy. **Answer:** ADR-0021 — `shadowed_by` record on the covered edge; counting queries skip it, truth queries keep it, shadows re-validate when covering edges change; linter proposes, humans confirm, nothing is deleted. **Status:** Solved (design).
 
 ### TB-026 — Banana → Nuclear Bomb
 Vandalism that is structurally valid.
@@ -154,4 +154,4 @@ Abstract iPhone → Camera / → 802.11 are family truths; iPhone 10 uses 802.11
 
 ### TB-035 — The front camera arrives (retroactive specialization)
 "iPhone → Camera" was authored in 2007; in 2010 the front/rear distinction becomes historically important; by 2019 there are ultrawide/telephoto lenses with full specs — but only where contributors care (a dashcam's generic camera edge never specializes).
-**Stresses:** role-splitting after the fact; sub-line traits (telephoto = Pro only); opt-in depth for purchase-decision specs. **Answer:** ADR-0020 + `docs/examples/iphone-camera-worked-example.md` — specialization is purely additive (sub-roles via IS_TYPE_OF + edges at truth-granularity, incl. lazy sub-family nodes like iPhone Pro); the still-true generic edge is never archived; specs are attributes until the Manufacturing Test says otherwise; uneven resolution is normal and permanent. Coexisting generic+specific edges sharpen Q-06 (no double-counting). **Status:** Solved (design).
+**Stresses:** role-splitting after the fact; sub-line traits (telephoto = Pro only); opt-in depth for purchase-decision specs. **Answer:** ADR-0020 + `docs/examples/iphone-camera-worked-example.md` — specialization is purely additive (sub-roles via IS_TYPE_OF + edges at truth-granularity, incl. lazy sub-family nodes like iPhone Pro); the still-true generic edge is never archived — it becomes *shadowed* by the covering front/rear edges (ADR-0021), so counts stay correct and zoom-out stays cheap; specs are attributes until the Manufacturing Test says otherwise; uneven resolution is normal and permanent. **Status:** Solved (design).

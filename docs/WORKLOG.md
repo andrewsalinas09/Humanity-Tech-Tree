@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (later) — Q-06 resolved: shadowing (ADR-0021), triggered by "do we break iPhone→camera?"
+**Done:** User asked exactly what happens to the generic camera edge. Answer made fully concrete (5-step Specialize operation table; the edge is never broken) and the recurring dependency — the subsumption mechanism — was decided: ADR-0021, `shadowed_by` records on still-true covered edges; edit-time/wizard or linter-proposed + human-confirmed; counting queries skip shadows, truth queries don't; shadows re-validate (and edges resurface) when covering edges change; old transitive-reduction batch job becomes the proposing linter; PRIMARY_REFINEMENT redirects kept separate as migration advice. Node.cpp: `shadowed_by_edge_ids` on DependencyEdge. TB-025 → Solved; TB-035 and camera example updated to cite ADR-0021. Q-06 → Resolved.
+**Learned:** Three test cases (TB-025/035 + this question) converged on the same mechanism from different directions — good sign it's the right primitive. Residual solver-phase work: formal per-edge-type "fully covers" definition.
+**Next:** Q-02 (truth systems). Phase 1 OPEN list is down to Q-02/03/04/19/20 + deferred Q-10.
+
 ## 2026-08-09 (late night) — ADR-0020: additive specialization + uneven resolution (TB-035)
 **Done:** User's front-camera edge case (role splits when history makes a distinction important; multi-lens depth only where people care). ADR-0020 accepted: specialization is purely additive — sub-roles via IS_TYPE_OF + edges at truth-granularity; the still-true generic edge is NEVER archived (archiving is only for wrong-target edges); sub-family nodes (iPhone Pro) attach sub-line traits without exclusions; uneven resolution is normal and permanent (depth is opt-in, demand-driven; architecture must permit DigiKey-grade depth, never require it). Worked example: `docs/examples/iphone-camera-worked-example.md`. TB-035 Solved. Q-06 urgency raised (generic+specific coexistence now guaranteed → counting queries need subsumption before Phase 2). Wizard implication recorded: "Specialize" is a distinct additive verb from "Intercept".
 **Learned:** The scary-looking reconciliation ("history forces a new distinction") costs two adds and zero edits — the prime directive's payoff in action.

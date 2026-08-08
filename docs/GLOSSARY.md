@@ -37,7 +37,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **ProductIteration** — a data record (not node) for minor versions inside a series-root node (iPhone 3G inside "iPhone").
 - **Re-parenting** — inserting a node between a parent and its children, triggering the check queue.
 - **Reverse recipe search** — compositional search: give ingredients {WiFi, Touchscreen, Cellular}, intersect used-by sets, get Smartphone.
-- **Shadowed edge** — a still-true but redundant zoomed-out edge (iPhone→Lithium when iPhone→Battery→Lithium exists), masked so BOMs don't double-count.
+- **Shadowed edge** — a still-true edge fully covered by finer edges, carrying a `shadowed_by` record (ADR-0021): skipped by counting queries, kept by truth queries, re-validated when covering edges change. Never deleted.
 - **Specialization (additive)** — when a distinction becomes important, add sub-roles and truth-granular edges; never archive the still-true generic edge (ADR-0020). Distinct from Intercept, which archives a wrong-granularity edge.
 - **Sub-family** — a lazily created node for a product sub-line (iPhone Pro) so traits true of the sub-line but not the family attach without exclusions (ADR-0020).
 - **Significance Filter** — the six rules gating node creation: Progenitor, Bridge, Keystone, Scale, Divergence, Icon (ADR-0009).
