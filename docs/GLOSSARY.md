@@ -21,6 +21,8 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Exclusion override** — an instance's declaration that an inherited family edge does not apply to it ("no front camera"), with justification; NOT the same as logical NOT, which means "requires absence" (ADR-0019).
 - **Family root** — the node holding everything true of a versioned family as a whole (802.11, Thunderbolt): shared dependencies, family-wide mechanisms, iteration records, marketing aliases. Version nodes attach in a flat star (ADR-0018).
 - **Gatekeeper node** — a categorical chokepoint (Integrated Circuit, High-Pressure Vessel) that encodes an era boundary topologically: vacuum tubes can make a CPU but never an IC.
+- **Ground fact** — an observation about the world, citable to a source ("iPhone released 2007"); the ONLY thing the store holds (ADR-0026).
+- **Entailment** — anything that follows from ground facts (possibility, state, earliest-possible dates, counterfactual answers); always solved at query time, never stored (ADR-0026). Caches of entailments are permitted but never authoritative.
 - **Ghost edges** — context/human-layer edges hidden by default rendering; History Mode fades them in.
 - **God Mode** — the internal debugger UI/tracer tooling built before any public UI (ADR-0014).
 - **Golden Spike** — the first end-to-end vertical slice proving the solver (e.g. Boolean Logic → Vacuum Tubes → Transistor → Intel 4004).
