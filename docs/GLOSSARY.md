@@ -50,5 +50,6 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Temporal Leveling** — generational solving of improvement loops: Gen-0 primitive output builds the optimizer that upgrades Gen-1.
 - **Tracer bullet** — the minimal end-to-end Phase 1 build: hardcoded nodes → C++ solver → Graphviz dump.
 - **Unrealized** — a node whose constraints eliminate every path; surfaced as a bounty.
+- **Verification ladder** — the five computed levels per claim: L1 uncited (red) → L2 cited-unchecked → L3 machine-verified → L4 human-verified → L5 community-ratified (protected, not frozen). Computed from verification-event facts; demotion is automatic (ADR-0032).
 - **Validity status** — whether a claim is currently held true: current truth, disproven, superseded, hypothetical, subjective. Orthogonal to epistemic status.
 - **Vouch** — endorsement of a shadow-branch edit; three vouches merge it; vouching for vandalism costs reputation.
