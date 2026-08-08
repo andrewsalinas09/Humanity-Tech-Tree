@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (cont.) — ADR-0024 revised: the partition test (user's real rationale)
+**Done:** User explained WHY orthogonality matters: edge types are the index partition key for billion-node traversal + LLM semantic search. Standing at DuPont with thousands of interleaved ingredient/component edges, the TYPE is what prunes fan-out before reading anything. Revised ADR-0024 same-day: partition test (type ⟺ pruning need or machine behavior; qualifier ⟺ matters only after selection). Rulings: component≠ingredient and type-of≠refinement stay distinct TYPES (selectivity); spin-off/founded/etc. stay qualifiers (succession partitions prune to a handful — qualifier reads are free there; global flavor searches get a secondary index). Straw-man basis now ~8. Q-21 updated with remaining calls (KNOWLEDGE_REQUIREMENT time gate, SPECIFIES_STANDARD, DRIVES_NEED_FOR/INHIBITS).
+**Learned:** Both failure directions are real: too many types = overlap/unlearnable; too few = unselective partitions forcing qualifier scans. The basis is exactly the set of distinctions real traversals prune on.
+**Next:** Q-21 reduction with user (3 remaining calls) + Q-02 — the final schema-lock session.
+
 ## 2026-08-09 (cont.) — ADR-0024: orthogonal edge basis — user vetoed edge-type accretion
 **Done:** User rejected SPUN_OFF_FROM-style additions hard: every edge type must be orthogonal, no per-flavor types. ADR-0024 accepted: the orthogonality test (two types coexist ⟺ some machine consumer treats them differently; human-meaning-only differences are a `qualifier` slug on the edge instance); all previously floated candidates (APPLIES_TO, FOUNDED, SPUN_OFF_FROM, PRODUCED_BY, DISCOVERED_USING…) demoted to qualifiers; adding a basis type henceforth requires an ADR demonstrating new machine behavior. Q-21 reframed from collection to REDUCTION pass with straw-man basis ENABLES/PART_OF/SUBTYPE/OPTIMIZES/SUCCEEDS/ASSOCIATION (~20 enum members + ~15 candidates → ~6). TB-038 → Solved (qualifiers, not vocabulary gap). Glossary: qualifier.
 **Learned:** This is the same collapse rule as attributes-not-nodes / aliases-not-nodes / name-data-not-nodes, finally applied to edges — the last accretion surface. My earlier Q-21 framing was drifting accretive; the test bed process caught it via user taste check.

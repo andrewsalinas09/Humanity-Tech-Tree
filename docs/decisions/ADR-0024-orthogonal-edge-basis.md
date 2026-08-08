@@ -1,23 +1,30 @@
-# ADR-0024: Edge types are a minimal orthogonal basis; flavor is a qualifier, never a type
+# ADR-0024: Edge types are a minimal orthogonal basis — the traversal partition key
 
-- **Status:** Accepted
+- **Status:** Accepted (revised same-day with the user's underlying rationale)
 - **Date:** 2026-08-09
-- **Source:** user directive, restart session 2 ("spun off from is just a child... each edge MUST be orthogonal to every other edge, no questions")
+- **Source:** user directive + rationale, restart session 2
 
 ## Context
-The edge enum grew by accretion (~20 types plus ~15 pending candidates like FOUNDED, SPUN_OFF_FROM, APPLIES_TO, PRODUCED_BY). Left unchecked this ends at a thousand near-synonymous types for every way something can relate to something — unlearnable for contributors, unmaintainable at billions of edges, and full of overlap that makes queries ambiguous.
+The edge enum grew by accretion (~20 types + ~15 floated candidates like FOUNDED, SPUN_OFF_FROM, APPLIES_TO). Unchecked, this ends at a thousand near-synonymous types. But the fix is not maximal collapse either — the real constraint is *why* types exist at all.
+
+## The real rationale (the user's, verbatim in spirit)
+At target scale, a traverser must walk a billion-node graph with sub-second selection, and LLM semantic search must find the right relationships without reading everything. **Edge types are the index partition key for traversal**: standing at a high-fan-out node (DuPont with thousands of ingredient AND component edges interleaved), the type is what prunes the fan-out *before* anything else is read. Too many types → overlap, ambiguity, unlearnable for contributors and models. Too few → unselective partitions forcing qualifier scans on every hop. Both directions are failures.
 
 ## Decision
-1. **The orthogonality test:** two edge types may both exist only if some machine consumer (solver, traversal, inheritance, counting, rendering layer) must treat them differently. If only the human meaning differs, it is ONE type plus a **qualifier** (a slug/attribute on the edge instance).
-2. **Flavor is data.** "Spun off," "founded," "licensed," "rebranded," "authored," "discovered," custody periods — qualifiers on basis edges, never new types. The qualifier vocabulary grows freely without schema migrations; qualifier hygiene is handled like attribute names (LLM canonicalization, ADR-0004 pattern).
-3. **Q-21 becomes a reduction pass, not a collection pass:** map every existing and pending type onto a minimal basis. Straw-man basis (~6, to be finalized WITH the user — the judgment calls are theirs): ENABLES (existence traversal), PART_OF (composition/counting), SUBTYPE (taxonomy/inheritance), OPTIMIZES (skipped by existence, read by cost), SUCCEEDS (dated succession story), ASSOCIATION (ghost layer, solver-invisible).
-4. **All candidate types previously floated in ADRs/examples (APPLIES_TO, FOUNDED, SPUN_OFF_FROM, PRODUCED_BY, DISCOVERED_USING, etc.) are hereby qualifiers pending the Q-21 reduction** — this supersedes any earlier note implying they'd become enum members.
-5. Adding a genuinely new basis type is a schema event requiring an ADR demonstrating a new machine behavior — expected to be rare-to-never.
+1. **The partition test:** a distinction earns an edge TYPE iff a traverser at a high-fan-out node needs it to prune, or a machine consumer (solver, inheritance, counting) treats it differently. It stays a QUALIFIER (slug on the edge instance) if it only matters *after* selection has already narrowed to a small partition.
+2. **Rulings the test produces:**
+   - Component vs ingredient: **two types** ("contains as part" vs "made from" are different constantly-asked questions across huge interleaved fan-outs — the DuPont case).
+   - Type-of vs refinement: **two types** (classification walks vs version walks are different traversals).
+   - Spin-off / founded / rebranded / authored / discovered / custody / brand-applies: **qualifiers** — the SUCCEEDS/ASSOCIATION partitions already prune to a handful of edges per node; reading qualifiers there is free. Global qualifier searches are served by a secondary index, not a schema entry.
+3. **Straw-man basis (~8, finalized in Q-21 with the user):** ENABLES · IS_COMPONENT_OF · IS_INGREDIENT_OF · IS_TYPE_OF · IS_REFINEMENT_OF · OPTIMIZES · SUCCEEDS · ASSOCIATION.
+4. **Qualifier vocabulary grows freely as data** (LLM-canonicalized like attribute names, ADR-0004 pattern) — history's infinite texture at zero schema migrations.
+5. **Adding a basis type is a schema event** requiring an ADR that demonstrates a new pruning need or machine behavior. Expected rare.
 
 ## Why
-This is the same collapse rule used everywhere else in the design — purity is an attribute not a node (ADR-0004), WiFi 6 is an alias not a node (ADR-0018), rebrands are name data not new nodes (ADR-0022) — finally applied to edges, the last place accretion was still legal. A closed basis keeps contributors' mental model learnable (six questions: does it enable, compose, classify, optimize, succeed, or just relate?), keeps queries unambiguous, and makes history's infinite texture expressible at zero marginal schema cost.
+Same collapse rule as attributes-not-nodes (ADR-0004), aliases-not-nodes (ADR-0018), name-data-not-nodes (ADR-0022) — applied to edges, with the partition test supplying the principled place to STOP collapsing. The basis is exactly the set of distinctions real traversals prune on; everything else is payload.
 
 ## Consequences
-- `EdgeType` enum will shrink, not grow; `DependencyEdge` gains a `qualifier` slug. Executed in the Q-21 pass (with data-migration mapping table old→new+qualifier).
-- Wizard verbs ask basis-level questions and offer qualifier suggestions.
-- TB-038's "vocabulary gap" dissolves: FOUNDED/SPUN_OFF_FROM/custody are qualifiers on ASSOCIATION/SUCCEEDS edges.
+- `EdgeType` shrinks to the basis; `DependencyEdge` gains a `qualifier` slug; old→new+qualifier migration table produced in Q-21.
+- Qualifiers get a secondary index for global semantic/flavor searches.
+- Wizard verbs ask partition-level questions ("does it enable, compose, classify, optimize, succeed, or relate?") and suggest qualifiers.
+- TB-038's lineage edges: dated SUCCEEDS(qualifier: spun-off) and ASSOCIATION(qualifier: founded / produced-by).
