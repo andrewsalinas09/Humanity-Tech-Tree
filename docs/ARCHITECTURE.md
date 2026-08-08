@@ -42,7 +42,7 @@ First-class, with own identity and metadata:
 - **Modifier Stack** (ADR-0004): the solver composes virtual material instances (base attributes + stacked optimizer processes) and checks them against consumer constraints. New refinement tech is picked up automatically.
 - **Requirement inheritance:** refinement children inherit and tighten parent requirement edges at solve time (`getRecursiveRequirements` merge).
 - **Graceful ignorance:** dependency-less nodes are magic-box REALIZED leaves; unknown IDs become STUB nodes; filling gaps later re-propagates state. The graph must tolerate being incomplete everywhere, always.
-- **Diagnostics:** LCA analysis explains invalid connections and offers quick-fixes (swap / reclassify / widen). Impact analysis (kill-a-node) shows downstream collapse vs. multi-path survivors.
+- **Diagnostics:** LCA analysis explains invalid connections and offers quick-fixes (swap / reclassify / widen). Impact analysis (kill-a-node) shows downstream collapse vs. multi-path survivors. **Entailment-vs-fact contradiction is a missing-node detector** (TB-042): a node whose validity is current_truth but whose support paths all fail is *unrealized* — the same bounty mechanic as "iPhone has no path through battery," localizing exactly where the graph is incomplete.
 
 ## 3. Storage & runtime (ADR-0010)
 
