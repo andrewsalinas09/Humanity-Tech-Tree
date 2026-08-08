@@ -5,8 +5,8 @@ The living description of the design as it stands. `Node.cpp` / `AttributeRegist
 ## 1. The graph
 
 Two simultaneous structures, both made of edges:
-- the **dependency graph** (horizontal, causal: MAKES_POSSIBLE / IS_COMPONENT_OF / IS_INGREDIENT_OF / OPTIMIZES…)
-- the **taxonomy tree** (vertical: IS_TYPE_OF / IS_REFINEMENT_OF)
+- the **dependency graph** (horizontal, causal: ENABLES / IS_COMPONENT_OF / IS_INGREDIENT_OF / OPTIMIZES…)
+- the **taxonomy DAG** (vertical: IS_TYPE_OF / IS_REFINEMENT_OF — poly-hierarchy is legal; multi-parent requirement composition per ADR-0035 H17)
 
 Edges flow **provider → consumer** (past → future), never `REQUIRES_*` — one arrow direction keeps traversal and timeline rendering unambiguous. Direction is *meaning*, not access: every edge is indexed and navigable both ways, and the graph is **insertion-order independent** — contributors can build any chain from either end or the middle and converge to the same state (ADR-0023).
 
