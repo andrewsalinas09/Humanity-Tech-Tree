@@ -36,6 +36,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Modifier Stack** — solver-composed virtual material instance: base attributes + stacked optimizer processes, checked against consumer constraints.
 - **Optimization edge/path** — an edge that improves attributes rather than enabling existence; how specific requirements are satisfied and bootstrap loops terminate.
 - **Presumption** — an instance-level fact derived only from an inherited family edge, not asserted at the instance; rendered distinctly, so unrecorded exceptions are labeled incompleteness rather than false assertions (ADR-0019).
+- **Qualifier** — the flavor slug on an edge instance ("spun-off", "founded", "authored", "custody"); carries all human meaning that doesn't change machine behavior. Edge *types* are reserved for distinct machine semantics (ADR-0024).
 - **ProductIteration** — a data record (not node) for minor versions inside a series-root node (iPhone 3G inside "iPhone").
 - **Re-parenting** — inserting a node between a parent and its children, triggering the check queue.
 - **Reverse recipe search** — compositional search: give ingredients {WiFi, Touchscreen, Cellular}, intersect used-by sets, get Smartphone.
