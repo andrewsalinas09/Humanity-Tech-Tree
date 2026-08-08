@@ -51,3 +51,12 @@ LOD 0 simulation layer vs. LOD 1 blueprint layer (sim never traverses LOD 1), `i
 
 ## Q-16: Language/runtime commitment
 C++ solver is decided (ADR-0010), but nothing is said about the API server layer between Neo4j/solver and the web, nor build system, nor how the C++ solver is exposed (service? WASM? embedded?).
+
+## Q-17: Storage engine at real scale — decision reopened
+ADR-0010's Neo4j choice came from an older-generation LLM conversation and predates the scale estimate (tens of millions–billions of nodes; possibly TBs of data with content/citations). Re-evaluate against the 2026 landscape when Phase 5 approaches (graph DBs, relational+recursive CTEs, columnar, custom). Until then Phase 2 deliberately uses trivially-migratable storage (plain files/SQLite) per ADR-0016 — the *schema/serialization* is the real commitment, not the engine.
+
+## Q-18: Standard/version families and single-node fan-out (TB-013/014/015)
+The pattern for versioned families (802.11 b/g/n/ax, Thunderbolt 3/4/5, DDR generations) and for high-fan-out concepts (one CPU node serving hundreds of divergent consumer needs: speed, size, power, era). Proposed: family root + version nodes only where new dependencies appear (ADR-0009 applied to standards), sub-mechanisms (TSF) as METHOD_TECHNIQUE components of the family dated to their introducing version, consumers linking to the family unless version-specific, capability routers + attributes carrying the fan-out. Needs a worked example at real density before acceptance.
+
+## Q-19: Authoring UX for high-fan-in nodes (TB-027)
+How a contributor adds something like the ASML EUV machine, whose true parents span dozens of domains, without the half-finished node being wrong (it can't be, per ADR-0015 — but it must also not be *useless*). Candidates: domain-sectioned templates, "known-incomplete" badges, LLM-suggested parent checklists, bounties for missing sections.

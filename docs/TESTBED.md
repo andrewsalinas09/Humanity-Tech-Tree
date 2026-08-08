@@ -1,0 +1,137 @@
+# The Test Bed
+
+The permanent catalog of edge cases. **Every proposed design change must be checked against every case here. Every new edge case gets an entry the moment it's raised — before it's solved.** A schema/mechanism change that breaks any Solved case is rejected or must supersede the relevant ADR.
+
+Statuses: **Solved (design)** — a documented mechanism handles it (cite the ADR/doc); **Partial** — mostly handled, with a named gap; **OPEN** — no accepted answer (should have a Q-ID in OPEN-QUESTIONS).
+
+These are design-time tests today. When code exists, each becomes an executable fixture.
+
+---
+
+## A. Truth, time, and knowledge
+
+### TB-001 — Vacuum-tube iPhone
+An iPhone → CPU → switching element → vacuum tube path is technically true. The graph must keep it AND never present it as how iPhones are made.
+**Stresses:** technically-true edges, constraint pruning. **Answer:** ADR-0003 (constraints at the seams, e.g. Switching Speed). **Status:** Solved (design).
+
+### TB-002 — Steel/Bessemer bootstrap loop
+Iron → tools → steel → Bessemer → better steel. A cycle that must be legal and terminate.
+**Stresses:** cycle handling. **Answer:** ADR-0006 (OPTIMIZES edges are existence dead-ends; Temporal Leveling). **Status:** Solved (design).
+
+### TB-003 — Gunpowder is invented twice
+One node; China ~850 AD, Europe ~1250 AD; independently "current" in both.
+**Stresses:** regional truth. **Answer:** RegionalAvailability with per-region timelines, is_indigenous/import_source. **Status:** Solved (design).
+
+### TB-004 — Roman concrete is lost, then found
+Europe: Active (200 BC–476) → Lost (476–1414) → Active (1414–now), with named transition reasons.
+**Stresses:** knowledge-status timelines. **Answer:** TimeSegment vector + KnowledgeStatus + transition_reason_slug. **Status:** Solved (design).
+
+### TB-005 — Newton AND Leibniz invent calculus
+Independent discovery must not create two Calculus nodes or make either person a dependency.
+**Stresses:** people/works layer. **Answer:** ADR-0007 (two Works → one Concept). **Status:** Solved (design).
+
+### TB-006 — GoPro 10 drops GPS; 1–9 and 11+ have it
+A feature present, removed, restored across iterations of one product line.
+**Stresses:** iteration-level dependency changes. **Answer (partial):** ADR-0009 — iterations are data records with per-iteration tech links, so GPS presence is iteration data; multiple dated edges cover node-level lapses. **Gap:** is "which GoPros have GPS?" queryable if the info lives in iteration records rather than edges? **Status:** Partial.
+
+### TB-007 — Trinity test sorts before Hiroshima
+Both 1945; ordering matters for causality rendering.
+**Stresses:** date precision. **Answer:** decimal-year DatePoint (1945.54 < 1945.60). **Status:** Solved (design).
+
+### TB-008 — "Bronze Age" vs "July 4, 1776" vs "2 MYA"
+Wildly different dating textures with different error bars, all comparable.
+**Stresses:** fuzzy time. **Answer:** DatePoint uncertainty_range + TimeScale enum. **Status:** Solved (design).
+
+### TB-009 — "Aliens built the pyramids"
+A fringe edge on perfectly valid nodes (Aliens-as-concept, Pyramids) must be storable, filtered by default, and visible on request.
+**Stresses:** epistemic filtering. **Answer:** EpistemicStatus on edges; all truth levels stored, view-time filtering. **Status:** Solved (design) — but see Q-02 (truth-system overlap).
+
+### TB-010 — Phlogiston and Miasma
+Disproven but historically productive ideas: they motivated real science and inhibited other science.
+**Stresses:** wrong-but-influential content. **Answer:** ValidityStatus + BELIEF_SYSTEM nodes + MOTIVATED_BY/INHIBITS/DISPROVED_BY edges. **Status:** Solved (design).
+
+### TB-011 — Leonardo's tank / the Saturn V problem
+Designed but never built (THEORETICAL) vs. built but no longer buildable by us (OBSOLETE vs LOST — which is the Saturn V?).
+**Stresses:** knowledge-status semantics. **Answer (partial):** KnowledgeStatus enum covers the states; the Saturn V (knowledge exists on paper, industrial base gone) sits awkwardly between OBSOLETE and LOST. **Status:** Partial.
+
+## B. Abstraction, versions, and families
+
+### TB-012 — iPhone 12 vs 13 vs the Wii
+Near-identical iterations must NOT get nodes; an iteration with a genuinely new dependency (Wii ← MEMS accelerometer) must.
+**Stresses:** node-creation gating. **Answer:** ADR-0009 Significance Filter + ProductIteration records. **Status:** Solved (design).
+
+### TB-013 — One CPU node, hundreds of divergent branches
+We refuse per-SKU CPU nodes, yet "CPU" must fan out along many independent axes — speed, size, power, architecture, era — to different consumers with different needs.
+**Stresses:** whether attributes + capability edges + refinement chains can carry hundreds of distinct fan-outs from one node without either node explosion or mush. **Answer:** unproven combination of ADR-0004 (attributes), capability router nodes, and IS_REFINEMENT_OF chains. **Status:** OPEN (Q-18) — needs a worked example at real density.
+
+### TB-014 — Adding 802.11 TSF
+The user rabbit-holes into WiFi and wants to add TSF (Timing Synchronization Function). Where does it go? What about 802.11b/g/n/ax?
+**Stresses:** standard families, sub-mechanisms of standards, incremental authoring. **Proposed:** 802.11 family root; version nodes only where new dependencies appear (a/g ← OFDM, n ← MIMO, ax ← OFDMA — consistent with ADR-0009); TSF as a METHOD_TECHNIQUE node, component of the 802.11 MAC, dated to its introducing version; consumers link to the family unless they truly require a version. **Status:** OPEN (Q-18) — pattern proposed, unvalidated.
+
+### TB-015 — Thunderbolt 5 → 4 → 3
+A refinement chain where consumers usually care about the family, sometimes about a version (TB3 ← USB-C connector; TB5 ← PAM-3 signaling).
+**Stresses:** same as TB-014 from the consumer side: when do existing consumer edges migrate to a new version (re-parenting queue, Q-04)? **Status:** OPEN (Q-18).
+
+### TB-016 — Betamax
+A losing branch that must exist (dead ends are educational) without polluting the winner's lineage.
+**Stresses:** divergence handling. **Answer:** Significance Filter rule 5 + SUPERSEDED_BY/REPLACED_BY. **Status:** Solved (design).
+
+### TB-017 — The x86 prototype iPhone
+A historical one-off violates the family's requirement ("Mobile Processor"). Reality wins, but the rule must survive.
+**Stresses:** exceptions. **Answer:** ADR-0008 widening to LCA + RequirementOverride with justification. **Status:** Solved (design).
+
+### TB-018 — iPhone switches ARM → RISC-V (hypothetical)
+A platform transition must not require touching every historical instance.
+**Stresses:** dependency inversion. **Answer:** ADR-0008 interface/role nodes created lazily at the divergence moment. **Status:** Solved (design).
+
+## C. Materials, processes, and requirements
+
+### TB-019 — Grease lithium vs battery lithium
+One Lithium node; consumers with wildly different purity needs.
+**Stresses:** where specs live. **Answer:** ADR-0005 (consumer edge constraints) + ADR-0004 (optimization paths raise purity). **Status:** Solved (design).
+
+### TB-020 — 1kΩ vs 10kΩ resistor (the DigiKey problem)
+Millions of SKUs must not become millions of nodes — and per the prime directive, collapsing them must lose no truth, only resolution.
+**Stresses:** node-vs-attribute boundary. **Answer:** ADR-0004 Manufacturing Test + Lazy Split. **Status:** Solved (design).
+
+### TB-021 — Platinum OR (Palladium + Heat)
+A requirement satisfied by alternatives, one of which is itself a bundle; also "one expert OR a team of ten."
+**Stresses:** requirement logic expressiveness. **Answer:** none accepted — the LogicGroup vs alternative_path_id conflict. **Status:** OPEN (Q-01, the blocker).
+
+### TB-022 — Catalyst vs consumed vs shared
+Palladium isn't used up; a factory is shared; lithium is consumed.
+**Stresses:** allocation semantics. **Answer:** deliberately deferred with quantities (Q-10). **Status:** OPEN (accepted-open).
+
+### TB-023 — The oil refinery
+One process, many outputs (naphtha, kerosene…).
+**Stresses:** multi-output processes. **Answer:** pull-based — each product DEPENDS_ON the process node. **Status:** Solved (design).
+
+## D. Editing, growth, and community
+
+### TB-024 — Insert LiIon under Battery
+Re-parenting: which of Battery's component edges should move to LiIon?
+**Stresses:** the check queue. **Answer:** LLM keep-or-move triage + human review — pipeline unspecified. **Status:** OPEN (Q-04).
+
+### TB-025 — iPhone→Lithium after iPhone→Battery→Lithium exists
+A true-but-now-redundant zoomed-out edge must not double-count in BOMs or clutter rendering.
+**Stresses:** transitive redundancy. **Answer:** shadowing/subsumption vs. transitive-reduction jobs vs. proxy redirects — unchosen. **Status:** OPEN (Q-06).
+
+### TB-026 — Banana → Nuclear Bomb
+Vandalism that is structurally valid.
+**Stresses:** semantic sanity. **Answer:** ADR-0013 embedding sentinel + review queues + reputation. **Status:** Solved (design level; parameters open, Q-03).
+
+### TB-027 — The ASML EUV machine has a hundred parents
+A contributor adds a node whose true dependencies span optics, plasma physics, precision engineering, software, supply chains. Where do they start, and how does a half-finished node not become *wrong*?
+**Stresses:** authoring UX + graceful incompleteness. **Answer (partial):** stub nodes + "incomplete is fine" (prime directive) + templates (ADR-0012); but the actual contributor experience for high-fan-in nodes is undesigned. **Status:** OPEN (Q-19).
+
+### TB-028 — Mid-rabbit-hole authoring
+A user three levels deep adds a node whose parents they can't name yet. The graph must accept it and heal later.
+**Stresses:** graceful ignorance. **Answer:** stub nodes, magic-box leaves, state re-propagation on fill-in. **Status:** Solved (design).
+
+### TB-029 — WWI ← Franz Ferdinand
+The rare case where a person IS the dependency.
+**Stresses:** the people-via-works exception boundary. **Answer:** ADR-0007 allows direct links for genuinely person-contingent events; boundary criteria informal. **Status:** Partial.
+
+### TB-030 — The 100th edge case
+Someone raises a new scenario in chat and it evaporates.
+**Stresses:** the process itself. **Answer:** this file — every new case gets a TB entry before it gets a solution. **Status:** Solved (by construction).

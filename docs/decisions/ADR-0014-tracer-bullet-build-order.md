@@ -1,6 +1,6 @@
 # ADR-0014: Build order — tracer-bullet solver first, public UI last
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0016 (tree-first; solver deferred to Phase 4)
 - **Date:** ~2026-01
 - **Source:** long-chat digest
 
