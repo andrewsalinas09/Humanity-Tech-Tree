@@ -20,7 +20,7 @@ When LiIon is inserted under Battery, the parent's component edges enter a queue
 Level-skipping (Product → Raw Element) mitigations all remain suggestions: layer model (Substances→Forms→Components→Assemblies→Artifacts), semantic-distance linter, "never link to a parent if a child exists" rule. Also open: assembly-vs-component double counting, method-of-assembly modeling.
 
 ## Q-06: Transitive redundancy mechanism
-For edges made redundant by refinement (iPhone→Lithium when iPhone→Battery→Lithium exists): shadow/subsumption masking vs. periodic transitive-reduction jobs vs. PRIMARY_REFINEMENT proxy redirects. No single mechanism chosen; probably some combination.
+For edges made redundant by refinement (iPhone→Lithium when iPhone→Battery→Lithium exists): shadow/subsumption masking vs. periodic transitive-reduction jobs vs. PRIMARY_REFINEMENT proxy redirects. No single mechanism chosen; probably some combination. Urgency raised by ADR-0020: additive specialization guarantees generic+specific edges coexist routinely (generic "camera" + front + rear must not count as three cameras — TB-035), so counting/BOM queries need the subsumption answer before Phase 2 queries ship.
 
 ## Q-07: Bulk semantic migration
 "Everyone linked Lithium but meant Refined Lithium" — ambiguity flags, consumer-category heuristics, atomic batch repointing, admin god-tools all sketched. Partially defused by fan-in (only ~10-20 core techs touch a raw material directly), but the workflow is undefined.

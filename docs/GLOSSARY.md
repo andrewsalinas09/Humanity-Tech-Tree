@@ -38,6 +38,8 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Re-parenting** — inserting a node between a parent and its children, triggering the check queue.
 - **Reverse recipe search** — compositional search: give ingredients {WiFi, Touchscreen, Cellular}, intersect used-by sets, get Smartphone.
 - **Shadowed edge** — a still-true but redundant zoomed-out edge (iPhone→Lithium when iPhone→Battery→Lithium exists), masked so BOMs don't double-count.
+- **Specialization (additive)** — when a distinction becomes important, add sub-roles and truth-granular edges; never archive the still-true generic edge (ADR-0020). Distinct from Intercept, which archives a wrong-granularity edge.
+- **Sub-family** — a lazily created node for a product sub-line (iPhone Pro) so traits true of the sub-line but not the family attach without exclusions (ADR-0020).
 - **Significance Filter** — the six rules gating node creation: Progenitor, Bridge, Keystone, Scale, Divergence, Icon (ADR-0009).
 - **Stub node** — auto-generated placeholder for an unknown referenced ID; the graph tolerates incompleteness everywhere.
 - **Temporal Leveling** — generational solving of improvement loops: Gen-0 primitive output builds the optimizer that upgrades Gen-1.

@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (late night) — ADR-0020: additive specialization + uneven resolution (TB-035)
+**Done:** User's front-camera edge case (role splits when history makes a distinction important; multi-lens depth only where people care). ADR-0020 accepted: specialization is purely additive — sub-roles via IS_TYPE_OF + edges at truth-granularity; the still-true generic edge is NEVER archived (archiving is only for wrong-target edges); sub-family nodes (iPhone Pro) attach sub-line traits without exclusions; uneven resolution is normal and permanent (depth is opt-in, demand-driven; architecture must permit DigiKey-grade depth, never require it). Worked example: `docs/examples/iphone-camera-worked-example.md`. TB-035 Solved. Q-06 urgency raised (generic+specific coexistence now guaranteed → counting queries need subsumption before Phase 2). Wizard implication recorded: "Specialize" is a distinct additive verb from "Intercept".
+**Learned:** The scary-looking reconciliation ("history forces a new distinction") costs two adds and zero edits — the prime directive's payoff in action.
+**Next:** Q-02 (truth-systems), and Q-06 moved up the priority list.
+
 ## 2026-08-09 (night) — ADR-0019: inheritance + exclusion overrides (TB-034)
 **Done:** User's edge case (per-iPhone WiFi versions; an instance lacking a family feature; Sony vs Canon sensors) split into: already-solved (per-instance specificity = ADR-0008/0018) and a real gap — absence. ADR-0019 accepted: family edges are inheritable defaults; instances WIDEN (subsumes ADR-0008's RequirementOverride) or EXCLUDE with justification; inherited-unasserted facts are labeled *presumptions* (keeps ADR-0015 intact); contiguous gaps use dated edges (front camera from 2010), scattered gaps use exclusions. Documented the NOT-vs-EXCLUDE trap (requires-absence ≠ does-not-inherit). Node.cpp: InheritanceOverride struct + field. TB-034 added and Solved. Glossary: exclusion override, presumption.
 **Learned:** Real history improved the test case: iPhone 1 HAD a rear camera; the front camera (iPhone 4, 2010) is the true dated-edge example.
