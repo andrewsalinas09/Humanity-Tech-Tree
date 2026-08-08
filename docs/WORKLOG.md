@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (cont.) — Q-21 rulings: two collapses, TB-039, one call left
+**Done:** User supplied the reasoning behind each remaining edge type; applying their own partition test collapsed two: KNOWLEDGE_REQUIREMENT → ENABLES (the Einstein-in-1000BC time gate is ordinary MAX-over-dependency-dates propagation; "humans have no parents except knowledge" survives as a linter category rule — BIOLOGICAL_ENTITY only receives ENABLES from knowledge/works) and SPECIFIES_STANDARD → ENABLES (standards are STANDARD_UNIT nodes; traversers prune on target category, no edge partition needed). TB-039 added+Solved: demand attaches to the disease not the virus; virus is separately an ingredient (canonical orthogonality demo); lightning-rod "mitigation" is the demand edge read in reverse — no edge needed; inhibits qualifier reserved for suppression. Q-21 updated; one call remains: one story partition or two (INFLUENCES vs ASSOCIATION; WWII fan-out argues two; assistant lean two).
+**Learned:** Node categories are the node-side partition key — an edge type is unnecessary whenever the endpoint's category already prunes (the IEEE 754 collapse generalizes).
+**Next:** User rules on the story-partition split → finalize Q-21 basis + mapping table; then Q-02.
+
 ## 2026-08-09 (cont.) — ADR-0024 revised: the partition test (user's real rationale)
 **Done:** User explained WHY orthogonality matters: edge types are the index partition key for billion-node traversal + LLM semantic search. Standing at DuPont with thousands of interleaved ingredient/component edges, the TYPE is what prunes fan-out before reading anything. Revised ADR-0024 same-day: partition test (type ⟺ pruning need or machine behavior; qualifier ⟺ matters only after selection). Rulings: component≠ingredient and type-of≠refinement stay distinct TYPES (selectivity); spin-off/founded/etc. stay qualifiers (succession partitions prune to a handful — qualifier reads are free there; global flavor searches get a secondary index). Straw-man basis now ~8. Q-21 updated with remaining calls (KNOWLEDGE_REQUIREMENT time gate, SPECIFIES_STANDARD, DRIVES_NEED_FOR/INHIBITS).
 **Learned:** Both failure directions are real: too many types = overlap/unlearnable; too few = unselective partitions forcing qualifier scans. The basis is exactly the set of distinctions real traversals prune on.
