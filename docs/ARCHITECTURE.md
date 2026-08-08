@@ -63,6 +63,7 @@ People connect via WORK_PUBLICATION nodes (ADR-0007); possibility checks ignore 
 
 - First-principles derivation: full dependency chain of X down to natural law.
 - "Can I build a Musket in Europe in 1300?" — earliest-possible-date = MAX over hard deps, intersected with regional timelines.
+- Counterfactuals: "Could Rome have had steam engines?" — possibility propagates ONLY through necessary dependencies (concepts/capabilities/materials/techniques), never through works or people, and returns a gap list (ADR-0025). Actual dates and possible dates are separate computations.
 - Compositional "reverse recipe" search: {WiFi, Touchscreen, Cellular} → Smartphone (inverted index + intersection).
 - Impact analysis: kill a node, watch dependents die.
 - "How was X first made" (skip optimizers) vs. "how is X made well" (traverse them).
