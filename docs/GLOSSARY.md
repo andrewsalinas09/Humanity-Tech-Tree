@@ -1,0 +1,43 @@
+# Glossary
+
+Domain terms used across docs, code, and conversations. Keep alphabetical.
+
+- **Abstract node** — a concept-level node ("battery", "GoPro") whose concrete realizations are separate instance nodes. Should not directly carry component/ingredient edges.
+- **Bag of Rules** — scoped policies attached at a root product ("all Lithium in my tree ≥ 99.9% pure") carried down the solve recursion; intermediate nodes stay dumb; strictest wins.
+- **Blast radius** — moderation principle: damage a user can do is inversely proportional to a node's importance; edit rights gated by dependency mass.
+- **Bootstrap loop** — a cycle where technology improves its own prerequisites (iron → tools → steel → better tools). Legal because OPTIMIZES edges are existence dead-ends; resolved generationally (Temporal Leveling).
+- **Bounty** — a publicly surfaced problem (unrealized node, flagged edge) users are invited to fix; the gamification loop.
+- **Capability node** — a router between physics and engineering ("High-Speed Logic Switching", "True Flatness") so providers don't need edges to every consumer ever built.
+- **Chain of Responsibility** — each node translates incoming demands into its own lower-level demands (iPhone: performance → CPU: process size → transistor: purity). "You only constrain the things you physically touch."
+- **ChangeRequest / Shadow branch** — a user's proposed edit, isolated from the master graph until reviewed, vouched, and merged. "Git for History."
+- **Check queue** — edges awaiting LLM keep-or-move triage after a re-parenting event, before human review.
+- **Circuit breaker** — automated rejection/freezing of dangerous edits (cycles, mass orphaning, absurd semantic distance).
+- **Concept / Paradigm / Artifact** — the three abstraction layers: interface ("Car") / abstract class ("Internal Combustion Automobile") / historical instance ("Benz Patent-Motorwagen").
+- **Constraint** — an attribute comparison on a consumer edge (size < X, purity > Y) that prunes paths at query time.
+- **Dependency mass / weight** — how many nodes transitively depend on a node; determines its protection level.
+- **DigiKey problem** — the node-explosion that results from modeling every part variant as a node; solved by attributes (ADR-0004).
+- **Epistemic status** — confidence a claim is true: mainstream fact → high confidence → debated → uncertain origin → fringe theory → mythology. Orthogonal to validity.
+- **Gatekeeper node** — a categorical chokepoint (Integrated Circuit, High-Pressure Vessel) that encodes an era boundary topologically: vacuum tubes can make a CPU but never an IC.
+- **Ghost edges** — context/human-layer edges hidden by default rendering; History Mode fades them in.
+- **God Mode** — the internal debugger UI/tracer tooling built before any public UI (ADR-0014).
+- **Golden Spike** — the first end-to-end vertical slice proving the solver (e.g. Boolean Logic → Vacuum Tubes → Transistor → Intel 4004).
+- **Instance** — a concrete realization of an abstract node, connected via IS_TYPE_OF; an ordinary node, never a sub-ID.
+- **Knowledge status** — whether know-how is active, theoretical, lost, obsolete, or mythical *in a given region and time segment*.
+- **Lazy abstraction** — link to the most specific true leaf; create abstract parents only when a second implementation forces it.
+- **Lazy Split** — when unsure node-vs-attribute, start as attribute: splitting later is easy, merging nodes is hard.
+- **LCA / widening** — handling exceptions by relaxing a requirement to the Least Common Ancestor (recorded as a RequirementOverride), never deleting it.
+- **Logic group** — the AND/OR requirement structure on edges. ⚠️ Two competing designs exist (Q-01).
+- **Manufacturing Test** — split into a new node only when BOM/physics/supply chain changes; otherwise it's an attribute.
+- **Modifier Stack** — solver-composed virtual material instance: base attributes + stacked optimizer processes, checked against consumer constraints.
+- **Optimization edge/path** — an edge that improves attributes rather than enabling existence; how specific requirements are satisfied and bootstrap loops terminate.
+- **ProductIteration** — a data record (not node) for minor versions inside a series-root node (iPhone 3G inside "iPhone").
+- **Re-parenting** — inserting a node between a parent and its children, triggering the check queue.
+- **Reverse recipe search** — compositional search: give ingredients {WiFi, Touchscreen, Cellular}, intersect used-by sets, get Smartphone.
+- **Shadowed edge** — a still-true but redundant zoomed-out edge (iPhone→Lithium when iPhone→Battery→Lithium exists), masked so BOMs don't double-count.
+- **Significance Filter** — the six rules gating node creation: Progenitor, Bridge, Keystone, Scale, Divergence, Icon (ADR-0009).
+- **Stub node** — auto-generated placeholder for an unknown referenced ID; the graph tolerates incompleteness everywhere.
+- **Temporal Leveling** — generational solving of improvement loops: Gen-0 primitive output builds the optimizer that upgrades Gen-1.
+- **Tracer bullet** — the minimal end-to-end Phase 1 build: hardcoded nodes → C++ solver → Graphviz dump.
+- **Unrealized** — a node whose constraints eliminate every path; surfaced as a bounty.
+- **Validity status** — whether a claim is currently held true: current truth, disproven, superseded, hypothetical, subjective. Orthogonal to epistemic status.
+- **Vouch** — endorsement of a shadow-branch edit; three vouches merge it; vouching for vandalism costs reputation.
