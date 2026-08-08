@@ -30,7 +30,7 @@ Europe: Active (200 BC–476) → Lost (476–1414) → Active (1414–now), wit
 Independent discovery must not create two Calculus nodes or make either person a dependency.
 **Stresses:** people/works layer. **Answer:** ADR-0007 (two Works → one Concept). **Status:** Solved (design).
 
-### TB-006 — GoPro 10 drops GPS; 1–9 and 11+ have it
+### TB-006 — GoPro 12 drops GPS; 1–11 and 13+ have it
 A feature present, removed, restored across iterations of one product line.
 **Stresses:** iteration-level dependency changes. **Answer (partial):** ADR-0009 — iterations are data records with per-iteration tech links, so GPS presence is iteration data; multiple dated edges cover node-level lapses. **Gap:** is "which GoPros have GPS?" queryable if the info lives in iteration records rather than edges? **Status:** Partial.
 
@@ -135,3 +135,15 @@ The rare case where a person IS the dependency.
 ### TB-030 — The 100th edge case
 Someone raises a new scenario in chat and it evaporates.
 **Stresses:** the process itself. **Answer:** this file — every new case gets a TB entry before it gets a solution. **Status:** Solved (by construction).
+
+### TB-031 — Tornadoes, wind, and malaria
+Technology depends on nature in two directions: as demand (tornado → DRIVES_NEED_FOR → Doppler radar; malaria → quinine) and as hard enabler (wind → windmill; river → water wheel; fault line → geothermal).
+**Stresses:** nature as first-class dependency. **Answer (partial):** NATURAL_PHENOMENON category + DRIVES_NEED_FOR and enabling edges cover both directions. **Gap:** natural phenomena need RegionalAvailability too — a windmill is not buildable where there is no wind — and nobody has stated that nature nodes participate in regional buildability logic. **Status:** Partial.
+
+### TB-032 — "Does ASML's parent already exist?" at a billion nodes
+A contributor needs a parent node and must learn in seconds whether it exists, under any synonym, among billions of nodes — or duplicates will metastasize.
+**Stresses:** semantic existence-search as core infrastructure. **Proposed:** every node embedded at creation; search-first authoring runs ANN candidate retrieval + LLM judgment ("same / child of existing / new"); billion-scale ANN is proven industry tech, so the risk is pipeline design, not feasibility. Prime-directive asymmetry: always err toward creating (duplicates are *incomplete*, fixable by ADR-0011 merge redirects); never auto-merge distinct things (that would be *wrong*). **Status:** OPEN (Q-20).
+
+### TB-033 — WiFi 1–4 lack TSF, 5–8 have it (hypothetical)
+Feature presence varying — possibly non-contiguously — across a version family. The GoPro problem (TB-006) wearing a standards hat; one mechanism must solve both.
+**Stresses:** version-scoped feature attachment; "graph inside a node" intuition. **Proposed:** feature presence attaches at whatever granularity exists — IS_COMPONENT_OF edges to version *nodes* where they exist, iteration-record data where they don't, lifting record→edge when a version node is later created (incomplete → refined, never wrong). The "inner graph" of a family is ordinary scoped nodes/edges collapsed into the family bubble by zoom/LOD rendering — a viewer behavior, not a storage mechanism. **Status:** OPEN (Q-18, with TB-006).
