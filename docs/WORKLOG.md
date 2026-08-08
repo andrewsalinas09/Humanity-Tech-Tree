@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (later still) — Q-01 resolved: requirement logic is a boolean expression tree
+**Done:** ADR-0017 accepted (user approved AND/OR/NOT tree, trusting judgment on details): expression tree lives on the consumer node with edge-ID leaves; absent tree = AND of all hard edges; NOT included but editorially discouraged (breaks monotonicity that makes incomplete graphs safe); LogicGroup and alternative_path_id both retired. Node.cpp updated (LogicGroup → RequirementExpr, moved before HistoryNode; edge logic field removed). TB-021 → Solved. Q-01 → Resolved. ARCHITECTURE/GLOSSARY/ROADMAP updated.
+**Learned:** The wizard's "alternative or additional?" prompt (ADR-0012 Componentize) is the authoring-side guard that keeps the all-AND default honest.
+**Next:** Q-18 — hand-work the full 802.11 family example (versions, TSF, consumers, TB-033 lifting rule) to validate the version-family pattern.
+
 ## 2026-08-09 (later) — Nature, semantic existence-search, version-scoped features
 **Done:** Added TB-031 (nature as dependency — gap found: natural phenomena need RegionalAvailability for buildability), TB-032 (semantic "does it exist?" search at billion scale → Q-20: embed-on-create + ANN + LLM judgment, create-don't-merge asymmetry), TB-033 (WiFi 1-4/5-8 TSF hypothetical = TB-006 GoPro problem generalized; feature presence attaches at whatever granularity exists, lifts record→edge when version nodes appear). User corrected TB-006 to GoPro 12.
 **Learned:** User's "graph inside a node" intuition for 802.11 is right as zoom/LOD *rendering*, rejected as *storage* (would create a second structural mechanism; scoped ordinary nodes/edges + viewer collapse achieve it). User scale ambition confirmed: design must not be limited in theory (billions of nodes).

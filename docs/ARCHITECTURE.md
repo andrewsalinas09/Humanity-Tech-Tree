@@ -28,7 +28,7 @@ Node creation is gated by the six-rule **Significance Filter** (ADR-0009); minor
 First-class, with own identity and metadata:
 - **Truth:** `EpistemicStatus` (mainstream fact → mythology) and `ValidityStatus`, independent axes; ALL truth levels are stored, users filter at view time. (Overlap between the truth systems is unresolved — Q-02.)
 - **Time:** optional start/end `DatePoint` (decimal year, negative = BCE, `uncertainty_range`, `TimeScale`). Multiple active periods = multiple edges. Decimal years exist so Trinity (1945.54) sorts before Hiroshima (1945.60).
-- **Requirement logic:** ⚠️ two competing designs — three-level `LogicGroup` (in code) vs. flat `alternative_path_id` (chat's final word). **Q-01, resolve before the solver.**
+- **Requirement logic (ADR-0017):** a boolean expression tree on the *consumer node* — AND/OR/NOT over edge-ID leaves, arbitrarily nested. No tree = AND of all hard dependency edges (the common case; lazy authoring stays legal). NOT exists for completeness but is editorially discouraged: it breaks the monotonicity that makes incomplete graphs safe.
 - **Constraints:** `AttributeConstraint`s (GT/LT/EQ/CONTAINS) — always declared by the consumer (ADR-0005).
 - **Optimization factors:** per-edge deltas (cost, rate, quality, size, energy, safety, accessibility; negatives = trade-offs).
 - **Provenance:** `justification`, `source_urls`, `impact_weight`, `visual_category_slug` (pure UI grouping).

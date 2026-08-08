@@ -96,7 +96,7 @@ Millions of SKUs must not become millions of nodes — and per the prime directi
 
 ### TB-021 — Platinum OR (Palladium + Heat)
 A requirement satisfied by alternatives, one of which is itself a bundle; also "one expert OR a team of ten."
-**Stresses:** requirement logic expressiveness. **Answer:** none accepted — the LogicGroup vs alternative_path_id conflict. **Status:** OPEN (Q-01, the blocker).
+**Stresses:** requirement logic expressiveness. **Answer:** ADR-0017 — boolean expression tree on the consumer node: `OR(platinum, AND(palladium, heat))`; `OR(expert, AND(p1…p10))`. Absent tree = AND of all hard edges; NOT legal but discouraged (monotonicity). **Status:** Solved (design).
 
 ### TB-022 — Catalyst vs consumed vs shared
 Palladium isn't used up; a factory is shared; lithium is consumed.

@@ -3,7 +3,7 @@
 Phases follow ADR-0016 (tree first; solver is Phase 4). This file always states the **current focus** — update it when the focus changes.
 
 ## Current focus
-**Phase 1 — schema lock via the test bed.** Work through `docs/TESTBED.md`: drive every OPEN/Partial case to Solved (design), starting with Q-01 (requirement logic, TB-021) and Q-18 (standard families / CPU fan-out, TB-013/014/15). Design changes happen HERE, on paper, where they're still cheap — that's the whole point of this phase.
+**Phase 1 — schema lock via the test bed.** Work through `docs/TESTBED.md`: drive every OPEN/Partial case to Solved (design). Q-01 is resolved (ADR-0017 boolean expression trees); next up is Q-18 (standard families / CPU fan-out, TB-013/014/015/033), then Q-02 (truth-system overlap). Design changes happen HERE, on paper, where they're still cheap — that's the whole point of this phase.
 
 ## Phase 0 — Consolidation ✅ (2026-08-08)
 Doc system built; 10k lines of old chats distilled into ADRs, open questions, digests. Test bed established (2026-08-09).

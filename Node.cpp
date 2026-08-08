@@ -260,6 +260,18 @@ public:
 };
 */
 
+// Requirement logic (ADR-0017): a boolean expression tree over the consumer
+// node's incoming dependency edge IDs. Leaves reference edges; AND/OR/NOT nest
+// arbitrarily. Absent tree = AND of all hard dependency edges. NOT is legal but
+// discouraged — it breaks the monotonicity that makes incomplete graphs safe.
+// Example: OR( platinum_edge, AND( palladium_edge, heat_edge ) )
+struct RequirementExpr {
+    enum class Op { EDGE, AND, OR, NOT };
+    Op op = Op::EDGE;
+    std::string edge_id;                    // when op == EDGE
+    std::vector<RequirementExpr> children;  // when op != EDGE
+};
+
 // ==========================================
 // 3. THE NODE
 // ==========================================
@@ -294,6 +306,10 @@ struct HistoryNode {
 
 std::unordered_map<AttributeID, AttributeValue> base_attributes;
 std::unordered_map<std::string, std::vector<AttributeModifier>> process_output_effects;
+
+    // ADR-0017: boolean expression tree over incoming dependency edges.
+    // std::nullopt = AND of all hard dependency edges (the common case).
+    std::optional<RequirementExpr> requirement_expr;
 };
 
 struct OptimizationFactors {
@@ -310,23 +326,6 @@ struct OptimizationFactors {
     float accessibility;     // Lowers the barrier to entry
 };
 
-struct LogicGroup {
-    // 1. The "Slot" or "Role" (AND)
-    // Example: 0 = "Primary Material", 1 = "Catalyst"
-    int functional_group_id;
-    std::string functional_group_name;
-
-    // 2. The "Option" (OR)
-    // Example: For Catalyst, 0 = "Platinum", 1 = "Palladium + Heat"
-    int variant_id;
-    std::string variant_name;
-
-    // 3. The "Fragment" (AND)
-    // Example: If Variant 1 is "Palladium + Heat",
-    // Palladium is part_id 0, Heat is part_id 1.
-    int part_id;
-    std::string part_name;
-};
 
 // ==========================================
 // 4. THE EDGE
@@ -348,8 +347,7 @@ struct DependencyEdge {
     std::optional<DatePoint> start_date;
     std::optional<DatePoint> end_date;
 
-    // --- THE LOGIC (The Math) ---
-    LogicGroup requirement_logic;
+    // Requirement logic lives on the consumer node (ADR-0017), not on edges.
 
     std::vector<AttributeConstraint> constraints;
 

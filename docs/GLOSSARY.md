@@ -26,7 +26,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Lazy abstraction** — link to the most specific true leaf; create abstract parents only when a second implementation forces it.
 - **Lazy Split** — when unsure node-vs-attribute, start as attribute: splitting later is easy, merging nodes is hard.
 - **LCA / widening** — handling exceptions by relaxing a requirement to the Least Common Ancestor (recorded as a RequirementOverride), never deleting it.
-- **Logic group** — the AND/OR requirement structure on edges. ⚠️ Two competing designs exist (Q-01).
+- **Requirement expression** — the boolean expression tree (AND/OR/NOT over edge leaves) on a consumer node defining how its dependencies combine; absent tree = AND of all hard edges (ADR-0017). Replaced the old "logic group" integer-ID designs.
 - **Manufacturing Test** — split into a new node only when BOM/physics/supply chain changes; otherwise it's an attribute.
 - **Modifier Stack** — solver-composed virtual material instance: base attributes + stacked optimizer processes, checked against consumer constraints.
 - **Optimization edge/path** — an edge that improves attributes rather than enabling existence; how specific requirements are satisfied and bootstrap loops terminate.

@@ -4,8 +4,8 @@ Unresolved design debates. Each gets an ID; when settled, mark `Resolved → ADR
 
 Sources: README brain-dump and the two chat digests in `docs/archive/digests/`.
 
-## Q-01: Logic-group expressiveness vs. simplicity — **the schema conflict to resolve first**
-`Node.cpp` carries the three-level `LogicGroup` (functional group AND → variant OR → part AND), but the abstraction chat's final design was a flatter single-level `alternative_path_id` per edge after the user found nested IDs "very confusing." The user's original ask (a group containing "one person" OR "a cluster of 10 people all required") needs two levels; neither shipped design cleanly supports arbitrary nesting. Decide the canonical requirement-logic model before writing the solver.
+## Q-01: Logic-group expressiveness vs. simplicity — **Resolved → ADR-0017**
+Requirement logic is a boolean expression tree (AND/OR/NOT, arbitrary nesting) on the consumer node, with edge-ID leaves; absent tree = AND of all hard edges. `LogicGroup` and `alternative_path_id` both retired.
 
 ## Q-02: Truth-system overlap
 Three partially redundant systems accumulated: `ValidityStatus` (on nodes AND edges), `EpistemicStatus` (edges), and a dropped `ConfidenceLevel` for dates (only `uncertainty_range` survived). Define the exact division of labor: scientific validity vs. historiographic confidence vs. edge plausibility.
