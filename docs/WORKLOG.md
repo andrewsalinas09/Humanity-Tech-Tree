@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (cont.) — TB-038 Keysight lineage; Q-21 created; "show the mess" into VISION
+**Done:** User's Keysight use case (scope → Agilent → HP → founders) added as TB-038: mechanisms fully covered by ADR-0007/0022/0023 composition (parallel Did-Happen/Must-Happen layers from one node, org churn never contaminating the dependency tree), but it surfaced vocabulary gaps — FOUNDED, SPUN_OFF_FROM, dated PRODUCED_BY custody. Created Q-21 (EdgeType reconciliation) as the formal home for all accumulated edge-vocab cargo (~15 pending types incl. APPLIES_TO), plus per-type rules: category compatibility (isValidConnection linter), traversal participation, narrative-layer flag. VISION.md "Truth with texture" strengthened with the user's articulation: show the mess or it isn't faithful; never simplify into a lie for convenience; Keysight→garage as the canonical demo.
+**Learned:** User's stated core motivation: faithfulness over convenience is WHY the tool will work. Corporate spin-offs = product-line custody transfers crossing org boundaries — a distinct shape from forks/rebrands, needing only vocabulary.
+**Next:** Q-02 (truth systems), then Q-21 (edge reconciliation) — both are bounded schema passes; good candidates to bundle.
+
 ## 2026-08-09 (cont.) — ADR-0023: bidirectional navigation + insertion-order independence (TB-037)
 **Done:** User's requirement ("Nokia to paper mill, paper mill to phone, add it anywhere and not be wrong") formalized as ADR-0023: (1) direction is meaning not access — every edge indexed/navigable both ways; (2) insertion-order independence pinned as an invariant — any order of true additions converges to the same graph (already implied by stubs/lazy abstraction/additive specialization/lifting; now a promise no future mechanism may break, and a TESTBED-level acceptance criterion); (3) mid-chain duplicate meets heal via search-first + merge redirects — convergence defined up to merges; (4) becomes an executable permutation-test fixture once code exists. TB-037 Solved. ARCHITECTURE updated.
 **Learned:** Order-independence was a lucky consequence of existing decisions; naming it converts it into a design constraint like the prime directive.
