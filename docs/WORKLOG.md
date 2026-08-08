@@ -12,6 +12,11 @@ Template:
 
 ---
 
+## 2026-08-09 (cont.) — ADR-0022: identity is the causal chain (TB-036, product morphing)
+**Done:** User's exercise: verify the arch survives every way a product can morph, incl. Ship of Theseus + rebrand. Worked example `docs/examples/product-morphing-worked-example.md` (Mustang gens 1-7 → Mach-E brand transplant; Twitter→X; Nokia pivots; Polaroid zombie brand; LibreOffice fork; category drift — 7-type mutation taxonomy, all resolving into existing machinery). ADR-0022 accepted: no stored "sameness" — identity is displayed as the dated causal chain; `name_history` (dated names, lazy) added to Node.cpp; brands promote to Brand nodes only on transplant (dated APPLIES_TO edges; never IS_REFINEMENT_OF across a brand jump); family roots may legally degrade into pure identity containers. TB-036 Solved. Glossary: Brand node, identity container.
+**Learned:** The trap was ever answering "is it the same thing?" — any stored sameness flag would eventually be wrong (ADR-0015); chains of dated facts cannot be. APPLIES_TO joins the edge-vocabulary backlog for the EdgeType reconciliation pass.
+**Next:** Q-02 (truth systems) — still the last schema-touching open question; edge-enum reconciliation right behind it.
+
 ## 2026-08-09 (later) — Q-06 resolved: shadowing (ADR-0021), triggered by "do we break iPhone→camera?"
 **Done:** User asked exactly what happens to the generic camera edge. Answer made fully concrete (5-step Specialize operation table; the edge is never broken) and the recurring dependency — the subsumption mechanism — was decided: ADR-0021, `shadowed_by` records on still-true covered edges; edit-time/wizard or linter-proposed + human-confirmed; counting queries skip shadows, truth queries don't; shadows re-validate (and edges resurface) when covering edges change; old transitive-reduction batch job becomes the proposing linter; PRIMARY_REFINEMENT redirects kept separate as migration advice. Node.cpp: `shadowed_by_edge_ids` on DependencyEdge. TB-025 → Solved; TB-035 and camera example updated to cite ADR-0021. Q-06 → Resolved.
 **Learned:** Three test cases (TB-025/035 + this question) converged on the same mechanism from different directions — good sign it's the right primitive. Residual solver-phase work: formal per-edge-type "fully covers" definition.

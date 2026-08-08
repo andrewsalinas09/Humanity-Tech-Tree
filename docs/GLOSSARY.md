@@ -7,6 +7,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Blast radius** — moderation principle: damage a user can do is inversely proportional to a node's importance; edit rights gated by dependency mass.
 - **Bootstrap loop** — a cycle where technology improves its own prerequisites (iron → tools → steel → better tools). Legal because OPTIMIZES edges are existence dead-ends; resolved generationally (Temporal Leveling).
 - **Bounty** — a publicly surfaced problem (unrealized node, flagged edge) users are invited to fix; the gamification loop.
+- **Brand node** — a brand promoted to its own node (lazily, only when it detaches from its original bearer), with dated APPLIES_TO edges to each product line it marked (ADR-0022). Until then a brand is just name data.
 - **Capability node** — a router between physics and engineering ("High-Speed Logic Switching", "True Flatness") so providers don't need edges to every consumer ever built.
 - **Chain of Responsibility** — each node translates incoming demands into its own lower-level demands (iPhone: performance → CPU: process size → transistor: purity). "You only constrain the things you physically touch."
 - **ChangeRequest / Shadow branch** — a user's proposed edit, isolated from the master graph until reviewed, vouched, and merged. "Git for History."
@@ -23,6 +24,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Ghost edges** — context/human-layer edges hidden by default rendering; History Mode fades them in.
 - **God Mode** — the internal debugger UI/tracer tooling built before any public UI (ADR-0014).
 - **Golden Spike** — the first end-to-end vertical slice proving the solver (e.g. Boolean Logic → Vacuum Tubes → Transistor → Intel 4004).
+- **Identity container** — a family root whose family-wide claims have all been date-bounded, widened, or pushed to generations, leaving only name, succession, and story edges; the legal, honest end state of a Ship-of-Theseus lineage (ADR-0022).
 - **Instance** — a concrete realization of an abstract node, connected via IS_TYPE_OF; an ordinary node, never a sub-ID.
 - **Knowledge status** — whether know-how is active, theoretical, lost, obsolete, or mythical *in a given region and time segment*.
 - **Lazy abstraction** — link to the most specific true leaf; create abstract parents only when a second implementation forces it.

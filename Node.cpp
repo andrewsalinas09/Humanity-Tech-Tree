@@ -298,6 +298,11 @@ struct HistoryNode {
     // --- Core Data ---
     std::string name;
     std::vector<std::string> aliases;
+
+    // ADR-0022: dated names for rebrands (Twitter 2006-2023, X 2023-).
+    // Lazy — empty until a rebrand happens. Aliases stay undated search keys.
+    struct DatedName { std::string name; std::optional<DatePoint> start, end; };
+    std::vector<DatedName> name_history;
     NodeCategory category;
     ValidityStatus validity;
 
