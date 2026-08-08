@@ -15,7 +15,7 @@ Doc system built; 10k lines of old chats distilled into ADRs, open questions, di
 - Output: a frozen v1 schema document (prose + serialization format), designed for changeability.
 
 ## Phase 2 — The tree itself
-- Hand-author a seed corridor (e.g. iPhone → modem/WiFi → 802.11 family → TSF; battery branch; CPU branch) in a simple migration-friendly format (plain files/SQLite — NOT the at-scale engine, see Q-17).
+- Seed corridor (user ruling): **the iPhone, all the way up** — one thread pulled honestly, following wherever it leads (TSMC, CPUs, operating systems, WiFi → encryption → the math, batteries, materials). It organically hits the Microprocessor density test (TB-013) and math conditionality without staging them. Simple migration-friendly format (plain files/SQLite — NOT the at-scale engine, see Q-17).
 - Read-only rabbit-hole viewer: click any node, see parents/children, time + region + epistemic filters. This is the first moment the project is *usable and lovable*.
 - Authoring done via scripts/agent sessions applying the wizard-verb semantics (ADR-0012) even before UI exists.
 

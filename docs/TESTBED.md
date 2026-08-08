@@ -51,8 +51,8 @@ Disproven but historically productive ideas: they motivated real science and inh
 **Stresses:** wrong-but-influential content. **Answer:** ValidityStatus + BELIEF_SYSTEM nodes + MOTIVATED_BY/INHIBITS/DISPROVED_BY edges. **Status:** Solved (design).
 
 ### TB-011 — Leonardo's tank / the Saturn V problem
-Designed but never built (THEORETICAL) vs. built but no longer buildable by us (OBSOLETE vs LOST — which is the Saturn V?).
-**Stresses:** knowledge-status semantics. **Answer (partial):** KnowledgeStatus enum covers the states; the Saturn V (knowledge exists on paper, industrial base gone) sits awkwardly between OBSOLETE and LOST. **Status:** Partial.
+Designed but never built vs. built but no longer buildable. Blueprints for the Saturn V exist; the suppliers, toolchains, and tribal knowledge are gone. OBSOLETE or LOST?
+**Stresses:** knowledge-status semantics; the buildability question. **Answer (user ruling, 2026-08-09):** neither — the question decomposes. Documentation/practice status per region stays a *fact*; "can we build it today" is *computed* (ADR-0026), and it has two honest answers depending which node you ask: the historical **artifact** (edges to specific 1960s parts whose timelines ended) is unbuildable with a gap list saying exactly why; the **paradigm** (role-level requirements) is buildable with substitutions listed — and "is it really a Saturn V?" is the sameness question the graph refuses (ADR-0022), showing the substitution list instead. Key rule: **unbuildable-with-no-traceable-why = missing nodes** (the TB-042 detector) — "how the RAM was built" is the missing node, not the rocket; it becomes a bounty. **Status:** Solved (design).
 
 ## B. Abstraction, versions, and families
 
@@ -130,15 +130,15 @@ A user three levels deep adds a node whose parents they can't name yet. The grap
 
 ### TB-029 — WWI ← Franz Ferdinand
 The rare case where a person IS the dependency.
-**Stresses:** the people-via-works exception boundary. **Answer:** ADR-0007 allows direct links for genuinely person-contingent events; boundary criteria informal. **Status:** Partial.
+**Stresses:** the people-via-works exception boundary. **Answer (user ruling, 2026-08-09):** the **substitutability test** — if any other person could have produced it, link via works; a direct person link is allowed only when that specific person's existence/death/decision is the causal mechanism. Explicitly a human judgment call with a strong default: **99.9% of the time the answer is NO** — the editing wizard makes direct person links deliberately high-friction (justification required, review flagged). **Status:** Solved (design).
 
 ### TB-030 — The 100th edge case
 Someone raises a new scenario in chat and it evaporates.
 **Stresses:** the process itself. **Answer:** this file — every new case gets a TB entry before it gets a solution. **Status:** Solved (by construction).
 
-### TB-031 — Tornadoes, wind, and malaria
-Technology depends on nature in two directions: as demand (tornado → DRIVES_NEED_FOR → Doppler radar; malaria → quinine) and as hard enabler (wind → windmill; river → water wheel; fault line → geothermal).
-**Stresses:** nature as first-class dependency. **Answer (partial):** NATURAL_PHENOMENON category + DRIVES_NEED_FOR and enabling edges cover both directions. **Gap:** natural phenomena need RegionalAvailability too — a windmill is not buildable where there is no wind — and nobody has stated that nature nodes participate in regional buildability logic. **Status:** Partial.
+### TB-031 — Tornadoes, wind, and malaria (and the sharper needle)
+Technology relates to nature two ways: the windmill *requires wind to turn*, but the sharper needle tech that vaccines drove into existence does NOT require vaccines — they're merely why it arrived in this timeline ("the better battery tech from the Windmill Explosion of 2164 doesn't require windmills").
+**Stresses:** nature as dependency; historical causation vs operational necessity. **Answer (user ruling, 2026-08-09):** the **operation test** — "does it require this to OPERATE/EXIST, or is this merely why it arrived in our timeline?" Operational requirements are ENABLES (nature nodes get full RegionalAvailability + timelines — wind everywhere, fault lines mapped, malaria's range shrinking; regional buildability checks them). Timeline-causation is ASSOCIATION (gave-rise-to / drives-need), solver-invisible — which keeps counterfactuals sound automatically (needle tech shows possible-without-vaccines; its real gates are metallurgy and wire-drawing). Generalizes ADR-0025's contingency mask from people-and-works to ALL historical causation. **Status:** Solved (design).
 
 ### TB-032 — "Does ASML's parent already exist?" at a billion nodes
 A contributor needs a parent node and must learn in seconds whether it exists, under any synonym, among billions of nodes — or duplicates will metastasize.
