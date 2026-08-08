@@ -52,8 +52,20 @@ LOD 0 simulation layer vs. LOD 1 blueprint layer (sim never traverses LOD 1), `i
 ## Q-16: Language/runtime commitment
 C++ solver is decided (ADR-0010), but nothing is said about the API server layer between Neo4j/solver and the web, nor build system, nor how the C++ solver is exposed (service? WASM? embedded?).
 
-## Q-17: Storage engine at real scale — decision reopened
-ADR-0010's Neo4j choice came from an older-generation LLM conversation and predates the scale estimate (tens of millions–billions of nodes; possibly TBs of data with content/citations). Re-evaluate against the 2026 landscape when Phase 5 approaches (graph DBs, relational+recursive CTEs, columnar, custom). Until then Phase 2 deliberately uses trivially-migratable storage (plain files/SQLite) per ADR-0016 — the *schema/serialization* is the real commitment, not the engine.
+## Q-17: Storage engine at real scale — decision reopened; research ACTIVE (2026-08-10)
+ADR-0010's Neo4j choice came from an older-generation LLM conversation and predates both the scale estimate and the agent-first ruling (ADR-0029). Requirements matrix derived from the ADRs — candidates are scored against ALL of these:
+
+- **R1 Scale path:** billions of nodes/edges, TB-scale payloads eventually; but must start tiny and cheap (Phase 2) with a credible growth path — no day-one cluster.
+- **R2 Deep traversal:** 10–100-hop recursive dependency chains; fat subgraph extraction for in-memory solving (ADR-0010 pattern); typed-edge partition pruning (ADR-0024).
+- **R3 Immutable facts + versions:** full per-entity version history, atomic section rollback, "patient zero" audits (ADR-0011/0026) — append-only/bitemporal models fit naturally.
+- **R4 Branching:** shadow-branch ChangeRequests — propose/amend/merge without touching master (ADR-0013); git-like data branching or cheap app-level equivalent.
+- **R5 Parallel agent writes:** high-throughput concurrent proposal ingestion with commutative merges (ADR-0023/0029).
+- **R6 Semantic search:** embedding per node, billion-scale ANN, integrated or sidecar (Q-20); qualifier/category/validity secondary indexes (R7).
+- **R8 MCP-first ergonomics:** cheap machine reads for LLM context assembly; machine-readable diffs and rejection reasons (ADR-0029).
+- **R9 Changeability:** self-hostable, sane licensing, and above all a clean export/serialization story — the schema is the commitment, the engine must be swappable (ADR-0016).
+- **R10 Dual traversal modes:** actual vs possible with category masks (ADR-0025).
+
+Research streams running: (a) 2026 graph-engine landscape; (b) versioned/branching/bitemporal stores; (c) embedding/ANN + MCP/agent-stack integration. Findings land in `docs/research/`.
 
 ## Q-18: Standard/version families and single-node fan-out — **Resolved → ADR-0018**
 Family root + significance-gated flat version stars + truth-granular feature attachment with record→edge lifting; fan-out as consumer-edge constraints + capability routers. Validated in `docs/examples/802-11-worked-example.md`. Residual: Phase 2 seed corridor must stress the Microprocessor node at real density.
