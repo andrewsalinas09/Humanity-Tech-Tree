@@ -218,8 +218,8 @@ def compute_layout(view):
                     path = _reach(path, pos[b][:2])
                 edge_paths[eid] = path
 
-    # timeline cascade (user ruling): versions step down-and-right of their
-    # family root at ~10°, ordered by date — a waterfall of generations
+    # SUB-CARD cascade (user ruling): versions tuck TIGHT against the family
+    # root — part of it, not neighbors — still timeline down-right by date
     by_family = {}
     for v, (fam, year) in vmap.items():
         by_family.setdefault(fam, []).append((year, v))
@@ -228,8 +228,8 @@ def compute_layout(view):
             continue
         fx, fy, fl = pos[fam]
         for i, (year, v) in enumerate(sorted(versions)):
-            pos[v] = (max(LNG_MIN, min(LNG_MAX, fx + 7.0 + 7.0 * i)),
-                      max(LAT_MIN, fy - 2.0 - 1.25 * i), fl)
+            pos[v] = (max(LNG_MIN, min(LNG_MAX, fx + 2.6 + 2.0 * i)),
+                      max(LAT_MIN, fy - 2.2 - 0.55 * i), fl)
     return pos, edge_paths
 
 

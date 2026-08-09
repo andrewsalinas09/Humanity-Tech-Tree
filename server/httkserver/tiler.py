@@ -373,10 +373,15 @@ def style():
              "paint": {"icon-opacity": [*DIM, 0.3, 1.0]}},
             {"id": "nodes", "type": "symbol", "source": "httk",
              "source-layer": "nodes", "filter": SHOW_NODE,
-             "layout": {"icon-image": "book", "icon-size": ["step", ["get", "rank"], 0.75, 0.6, 1.0, 0.95, 1.5],  # 3 tiers
+             "layout": {"icon-image": "book",
+                        # versions render as SUB-CARDS: smaller than any tier
+                        "icon-size": ["case", ["get", "version"], 0.55,
+                                      ["step", ["get", "rank"], 0.75, 0.6, 1.0, 0.95, 1.5]],
                         "icon-allow-overlap": True,
                         "symbol-sort-key": ["-", 1, ["get", "rank"]],  # hubs' labels win
-                        "text-field": ["get", "name"], "text-size": ["step", ["get", "rank"], 10, 0.6, 12, 0.95, 18],
+                        "text-field": ["get", "name"],
+                        "text-size": ["case", ["get", "version"], 9,
+                                      ["step", ["get", "rank"], 10, 0.6, 12, 0.95, 18]],
                         "text-offset": [0, 2.1], "text-anchor": "top",
                         "text-optional": True},
              "paint": {"icon-color": cat_colors,
