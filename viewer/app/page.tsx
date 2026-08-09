@@ -70,10 +70,16 @@ export default function Home() {
     const showNode = ["any", ["<=", ["get", "zmin"], ["zoom"]],
                       ["in", ["get", "family"], fams],
                       ["in", ["get", "node_id"], litN]] as any;
-    const showEdge = ["any", ["<=", ["get", "ezmin"], ["zoom"]],
-                      ["all", ["!=", ["get", "vfamily"], ""],
-                       ["in", ["get", "vfamily"], fams]],
-                      ["in", ["get", "edge_id"], litE]] as any;
+    const showEdge = ["all",
+      ["any",
+        ["all", ["<=", ["get", "ezmin"], ["zoom"]],
+         ["any", ["!", ["has", "zmax"]], ["<", ["zoom"], ["get", "zmax"]]]],
+        ["all", ["!", ["get", "lifted"]], ["!=", ["get", "vfamily"], ""],
+         ["in", ["get", "vfamily"], fams]],
+        ["in", ["get", "edge_id"], litE]],
+      // a manually demerged family retires its lifted stand-in edges
+      ["any", ["!", ["get", "lifted"]],
+       ["!", ["in", ["get", "vfamily"], fams]]]] as any;
     map.setFilter("nodes", showNode);
     map.setFilter("node-ring", ["all", ["!", ["get", "cited"]], showNode]);
     map.setFilter("edges", ["all", ["!", ["get", "ghost"]], showEdge]);

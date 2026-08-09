@@ -168,10 +168,38 @@ def tile(z: int, x: int, y: int):
                 "zmin": st["zmin"].get(n, 0),              # map LOD tier
             },
         })
+    VERSION_Z = 5                 # the zoom where versions auto-untuck
     for e in view._edges.values():
         a, b = pos.get(e["from"]), pos.get(e["to"])
         if not a or not b:
             continue
+        # EDGE LIFTING (ADR-0018 family-bubble semantics, user ruling): while
+        # a version is tucked, its edges re-aim at the family root — MIMO
+        # plugs visibly into 802.11 instead of floating with a culled edge.
+        va = st["vmap"].get(e["from"], (None,))[0]
+        vb = st["vmap"].get(e["to"], (None,))[0]
+        if (va is None) != (vb is None):
+            fam = va or vb
+            other = e["to"] if va else e["from"]
+            if other != fam and fam in pos and other in pos:
+                lp = [(pos[other][0], pos[other][1]), (pos[fam][0], pos[fam][1])]
+                if va:                       # keep direction: from → to
+                    lp.reverse()
+                lpx = [_lnglat_to_tilepx(lng, lat, z, x, y) for lng, lat in lp]
+                for run in _clip_polyline(lpx, -BUF, EXTENT + BUF):
+                    edges_feats.append({
+                        "geometry": {"type": "LineString",
+                                     "coordinates": [list(p) for p in run]},
+                        "properties": {"edge_id": e["edge_id"] + "~lift",
+                                       "type": e["type"],
+                                       "qualifier": e.get("qualifier") or "",
+                                       "ghost": e["type"] in GHOST_TYPES,
+                                       "shadowed": False, "lifted": True,
+                                       "rank": round(st["imp"].get(other, 0), 3),
+                                       "vfamily": fam,
+                                       "ezmin": st["zmin"].get(other, 0),
+                                       "zmax": VERSION_Z},
+                    })
         # dot's spline (routed AROUND node boxes) in world space, consistent
         # across tiles; straight fallback for satellite/ghost edges. Per-tile
         # convert + Liang-Barsky clip to buffer — no breaks at any zoom
@@ -302,7 +330,9 @@ def _edge_state(lit, dim, rest):
 # versions are the deepest tier (auto-tuck out, auto-untuck in). The viewer
 # re-composes these with the manual demerge override.
 SHOW_NODE = ["<=", ["get", "zmin"], ["zoom"]]
-SHOW_EDGE = ["<=", ["get", "ezmin"], ["zoom"]]
+SHOW_EDGE = ["all", ["<=", ["get", "ezmin"], ["zoom"]],
+             ["any", ["!", ["has", "zmax"]],          # lifted edges retire
+              ["<", ["zoom"], ["get", "zmax"]]]]      # once versions unfold
 
 
 @app.get("/style.json")
