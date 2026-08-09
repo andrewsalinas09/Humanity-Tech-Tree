@@ -271,3 +271,8 @@ def test_galaxy_scenario_extract_family(svc):
                for e in view.edges_out("iphone2", {"IS_TYPE_OF"}))
     # no re-fire: siblings now share a parent
     assert not svc.run_sibling_linter(min_shared=4)["posted"]
+    # ADR-0053 hoist linter: glass2 stayed per-instance (deliberate) — the
+    # linter flags it ONCE as a hoist bounty on the family
+    out = svc.run_hoist_linter()
+    assert "smartphone2" in out["posted"]
+    assert not svc.run_hoist_linter()["posted"]        # nagged at most once

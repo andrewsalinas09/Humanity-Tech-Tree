@@ -128,6 +128,7 @@ def _state():
         try:      # the graph files bounties on itself as it grows (ADR-0050/51)
             _get_svc().run_sibling_linter()
             _get_svc().run_texture_linter()
+            _get_svc().run_hoist_linter()
         except Exception as e:
             print(f"linters skipped: {e}")
     return _cache

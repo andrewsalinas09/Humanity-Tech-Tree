@@ -908,6 +908,54 @@ class Service:
                 posted.append(wanted)
         return {"posted": posted}
 
+    def run_hoist_linter(self, min_shared=2, max_posts=5):
+        """ADR-0053: claims attach at the earliest common ancestor. When ≥2
+        children of a family share an unshadowed claim the family lacks, the
+        graph files a hoist bounty. Deduped incl. fulfilled — a deliberate
+        keep-per-instance choice is nagged at most once."""
+        _, view = self._kernel()
+        from httk.store import HARD_TYPES
+        kids_of = {}
+        for n in view.nodes():
+            for e in view.edges_out(n, {"IS_TYPE_OF"}):
+                kids_of.setdefault(e["to"], []).append(n)
+        posted = []
+        with self.pg.conn.cursor() as c:
+            for fam, kids in sorted(kids_of.items()):
+                if len(kids) < 2 or len(posted) >= max_posts:
+                    continue
+                claim_kids = {}
+                for k in kids:
+                    for e in view.edges_in(k, HARD_TYPES):
+                        if not view.is_shadowed(e["edge_id"]):
+                            claim_kids.setdefault(
+                                (e["from"], e["type"]), set()).add(k)
+                fam_claims = {(e["from"], e["type"])
+                              for e in view.edges_in(fam, HARD_TYPES)}
+                shared = sorted((p, t) for (p, t), ks in claim_kids.items()
+                                if len(ks) >= min_shared
+                                and (p, t) not in fam_claims)
+                if not shared:
+                    continue
+                wanted = f"Hoist shared claims to {fam}"
+                c.execute("SELECT 1 FROM requests WHERE wanted_name=%s",
+                          (wanted,))
+                if c.fetchone():
+                    continue
+                c.execute(
+                    "INSERT INTO requests (want, subject_node, wanted_name, "
+                    "notes, requested_by) VALUES ('WANT_COVERAGE',%s,%s,%s,%s)",
+                    (fam, wanted,
+                     "auto-posted by the hoist linter (ADR-0053: attach at the "
+                     "earliest common ancestor). Shared by children but absent "
+                     "on the family: "
+                     + ", ".join(f"{p} ({t})" for p, t in shared)
+                     + ". Fulfill with extract_family (incremental hoist) — or "
+                     "close with a note if per-instance is deliberate.",
+                     Jsonb({"type": "system", "id": "linter"})))
+                posted.append(fam)
+        return {"posted": posted}
+
     def run_texture_linter(self, max_posts=8):
         """The gap economy (ADR-0051): missing texture auto-becomes bounties —
         undescribed nodes and unjustified hard edges get WANT_DESCRIPTION
