@@ -394,12 +394,61 @@ class Service:
         return {"reopened": request_id}
 
     def leaderboard(self, token, k=20):
+        """Points + lifetime contribution counts, straight off the fact log —
+        the user database's public face (user ruling 2026-08-09)."""
         self.authenticate(token)
         with self.pg.conn.cursor() as c:
-            c.execute("SELECT identity->>'id', identity->>'type', points "
-                      "FROM identities WHERE points > 0 "
-                      "ORDER BY points DESC LIMIT %s", (k,))
-            return [{"id": i, "type": t, "points": p} for i, t, p in c.fetchall()]
+            c.execute(
+                "SELECT i.identity->>'id', i.identity->>'type', i.points, "
+                "       COALESCE(f.n, 0) AS facts "
+                "FROM identities i LEFT JOIN "
+                "  (SELECT author->>'id' AS id, count(*) AS n FROM facts "
+                "   GROUP BY author->>'id') f ON f.id = i.identity->>'id' "
+                "ORDER BY i.points DESC, facts DESC LIMIT %s", (k,))
+            return [{"id": i, "type": t, "points": p, "facts": n}
+                    for i, t, p, n in c.fetchall()]
+
+    def contributions(self, token, identity_id, k=40):
+        """Everything an identity did — free, because every fact is stamped
+        (ADR-0041/0042: blame to people). Clickable history for the tab."""
+        self.authenticate(token)
+        out = {"id": identity_id}
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT points FROM identities WHERE identity->>'id'=%s",
+                      (identity_id,))
+            row = c.fetchone()
+            out["points"] = row[0] if row else 0
+            c.execute("SELECT kind, count(*) FROM facts "
+                      "WHERE author->>'id'=%s GROUP BY kind", (identity_id,))
+            out["counts"] = dict(c.fetchall())
+            c.execute("SELECT seq, kind, body, wall_time FROM facts "
+                      "WHERE author->>'id'=%s ORDER BY seq DESC LIMIT %s",
+                      (identity_id, k))
+            acts = []
+            for seq, kind, body, wt in c.fetchall():
+                if kind == "node.create":
+                    line, subj = f"created node {body.get('node_id')}", body.get("node_id")
+                elif kind == "edge.create":
+                    line = (f"linked {body.get('from')} → {body.get('to')} "
+                            f"({body.get('type')})")
+                    subj = body.get("to")
+                elif kind == "assert":
+                    line, subj = (f"asserted {body.get('field')} on "
+                                  f"{body.get('subject')}", body.get("subject"))
+                elif kind == "cite":
+                    line, subj = "attached a citation", None
+                else:
+                    line, subj = kind, None
+                acts.append({"seq": seq, "line": line, "subject": subj,
+                             "at": wt.isoformat()})
+            out["recent"] = acts
+            c.execute("SELECT request_id, want, subject_node, wanted_name "
+                      "FROM requests WHERE fulfilled_by->>'id'=%s "
+                      "ORDER BY request_id DESC", (identity_id,))
+            out["fulfilled"] = [{"request": r, "want": w,
+                                 "about": sn or wn}
+                                for r, w, sn, wn in c.fetchall()]
+        return out
 
     # -- internals -------------------------------------------------------------
     def _apply(self, identity, facts, notes):

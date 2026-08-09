@@ -84,3 +84,7 @@ Final basis (8): ENABLES / IS_COMPONENT_OF / IS_INGREDIENT_OF / IS_TYPE_OF / IS_
 
 ## Q-22: Living-graph tile generation (ADR-0044 risk #1)
 Incremental re-tiling + layout stability for a continuously-edited billion-node graph has NO published solution (the 2026 MSAGLJS paper stops at 33k nodes, client-side; Map of GitHub is a static snapshot). To solve: which tile cells invalidate per fact-append; layout stability under insertion (nodes must not teleport when a neighbor is added — dampened/incremental ELK? reserved-space strategies?); rebuild cadence tiers (dynamic tiler for fresh edits over a periodically rebaked pyramid — the research's proposed split); zoom↔LOD calibration governance (the coordinate contract is frozen SCHEMA-level, ADR-0044 risk #2). We own this frontier.
+
+## Q-23: Node tombstoning — created-in-error, no merge target (TB-070)
+**Status:** Open (raised 2026-08-09)
+The log is append-only and nodes are never deleted; duplicates heal by merge. But a node created in error with NO legitimate merge target (TB-070's bibliography husk) has no exit. Candidate shapes: a `node.tombstone` fact kind (identity persists in log, projections and tiles drop it, reversible by later fact); validity value `retracted_creation`; or flag + rendering exclusion only. Must obey ADR-0015 (a wrong tombstone = hidden truth, so probably ticket-gated) and ADR-0023 (order-independent under replay). Decide before public launch; flag-only until then.

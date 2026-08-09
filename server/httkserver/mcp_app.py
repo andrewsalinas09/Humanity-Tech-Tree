@@ -47,7 +47,13 @@ def build_app(pinned=None):
                     instructions="Edit the Humanity Tech Tree via deterministic "
                                  "verbs (docs/VERBS.md). search_similar before "
                                  "propose_node; Decisions come back as tickets — "
-                                 "resolve with resolve_decision.")
+                                 "resolve with resolve_decision. CITATIONS "
+                                 "(ADR-0045): pass the doc-id/URL directly as "
+                                 "source_node — NEVER create a node just to "
+                                 "cite; work-nodes are only for story-"
+                                 "significant works. Cite the claim being "
+                                 "evidenced (dates, edges, constraints) — "
+                                 "never the name.")
 
     @app.tool()
     def search_similar(query: str, ctx: Context) -> dict:

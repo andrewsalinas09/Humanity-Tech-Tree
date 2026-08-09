@@ -99,6 +99,15 @@ export default function Home() {
     loadRequests();
   };
 
+  const [who, setWho] = useState<any | null>(null);
+  const loadLeaders = async () => {
+    setBoard(await (await fetch(`${TILER}/leaderboard`)).json());
+    setWho(null);
+  };
+  const openWho = async (id: string) => {
+    setWho(await (await fetch(`${TILER}/contributions/${id}`)).json());
+  };
+
   const reopen = async (id: number) => {
     const reason = window.prompt("Why does this need re-opening?");
     if (!reason) return;
@@ -312,9 +321,11 @@ export default function Home() {
   return (
     <div style={S.shell}>
       <header style={S.tabs}>
-        {["Explore", "Bounties", "Tickets", "Changes"].map((t) => (
+        {["Explore", "Bounties", "Leaders", "Tickets", "Changes"].map((t) => (
           <button key={t}
-                  onClick={() => { setTab(t); if (t === "Bounties") loadRequests(); }}
+                  onClick={() => { setTab(t);
+                                   if (t === "Bounties") loadRequests();
+                                   if (t === "Leaders") loadLeaders(); }}
                   style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
             {t}
           </button>
@@ -401,11 +412,56 @@ export default function Home() {
                 </div>)}
             </div>
           )}
-          {tab !== "Bounties" && !card &&
+          {tab === "Leaders" && (
+            <div>
+              {!who && (<>
+                <h3 style={{ margin: "0 0 8px" }}>Leaderboard</h3>
+                {board.map((b, i) => (
+                  <div key={b.id} style={{ ...S.reqBox, cursor: "pointer" }}
+                       onClick={() => openWho(b.id)}>
+                    <b>#{i + 1} {b.id}</b>{" "}
+                    <small style={{ opacity: 0.5 }}>{b.type}</small>
+                    <div style={{ fontSize: 12.5, opacity: 0.7 }}>
+                      {b.points} karma · {b.facts} facts on the record
+                    </div>
+                  </div>))}
+              </>)}
+              {who && (
+                <div>
+                  <button onClick={() => setWho(null)} style={S.miniBtn}>
+                    ← back</button>
+                  <h3 style={{ margin: "8px 0 2px" }}>{who.id}</h3>
+                  <div style={{ opacity: 0.65, fontSize: 13, marginBottom: 8 }}>
+                    {who.points} karma ·{" "}
+                    {Object.entries(who.counts as Record<string, number>)
+                      .map(([k, v]) => `${v} ${k}`).join(" · ")}
+                  </div>
+                  {who.fulfilled.length > 0 && (<>
+                    <h4 style={{ margin: "10px 0 4px" }}>fulfilled requests</h4>
+                    {who.fulfilled.map((f: any) => (
+                      <div key={f.request} style={{ fontSize: 13 }}>
+                        #{f.request} · {f.want.replace("WANT_", "").toLowerCase()}
+                        {" · "}{f.about}
+                      </div>))}
+                  </>)}
+                  <h4 style={{ margin: "10px 0 4px" }}>on the record</h4>
+                  {who.recent.map((a: any) => (
+                    <div key={a.seq} style={{ fontSize: 12.5, margin: "3px 0" }}>
+                      <span style={a.subject ? S.link : undefined}
+                            onClick={() => { if (a.subject) { setTab("Explore");
+                              mapRef.current && focusOn(mapRef.current, a.subject); } }}>
+                        {a.line}
+                      </span>
+                      <small style={{ opacity: 0.4 }}> · seq {a.seq}</small>
+                    </div>))}
+                </div>)}
+            </div>
+          )}
+          {tab !== "Bounties" && tab !== "Leaders" && !card &&
             <p style={{ opacity: 0.6 }}>Click a node — or search, upper
             right. Red ring = needs citation. Faded = nobody vouched yet.
             Everything builds from zero.</p>}
-          {tab !== "Bounties" && card && !card.missing && (
+          {tab !== "Bounties" && tab !== "Leaders" && card && !card.missing && (
             <div>
               {card.image_url &&
                 <img src={card.image_url} alt="" style={S.img} />}
