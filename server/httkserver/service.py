@@ -87,6 +87,8 @@ def _merge_choice(verb, params, choice):
 class Service:
     def __init__(self, pg):
         self.pg = pg
+        self._kseq = -1
+        self._kcache = None
 
     # -- identity ------------------------------------------------------------
     @staticmethod
@@ -148,32 +150,65 @@ class Service:
         if used >= budget:
             raise BudgetExceeded(f"{identity.get('id')}: {used}/{budget} facts this hour")
 
-    # -- kernel view over the DB ---------------------------------------------
+    # -- kernel view over the DB (seq-cached: live search types fast) --------
     def _kernel(self):
-        store = Store.load(self.pg.export_jsonl())
-        return store, View(store)
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT COALESCE(MAX(seq),0) FROM facts")
+            seq = c.fetchone()[0]
+        if seq != self._kseq or self._kcache is None:
+            store = Store.load(self.pg.export_jsonl())
+            self._kcache = (store, View(store))
+            self._kseq = seq
+        return self._kcache
 
     # -- reads ---------------------------------------------------------------
     def search_similar(self, token, query):
-        """The two-lane existence gate (ADR-0048): exact/substring matching
-        (what forces duplicate tickets) + SEMANTIC candidates over the node
-        embeddings, with descriptions and scores — the CALLER judges (no LLM
-        in the transaction, ADR-0040; the callers are LLMs). The receipt
-        records both lanes: 'you were shown X' is on the books."""
+        """THE search (ADR-0048 + unified-front-door ruling 2026-08-09): one
+        implementation behind every surface — the map box, the add-node gate,
+        the link picker, and the MCP tool. Returns:
+          matches   exact/substring on id/name/alias (what forces dupe tickets)
+          semantic  nearest-by-meaning with descriptions + scores (advisory)
+          results   ONE ranked merged list, every row saying WHY it matched
+        The receipt records the lanes: 'you were shown X' is on the books."""
         identity, _ = self.authenticate(token)
         _, view = self._kernel()
-        q = query.lower()
-        hits = []
+        q = query.lower().strip()
+        hits, ranked, seen = [], [], set()
+
+        def add(n, reason, rank, score=None):
+            if n in seen or not q:
+                return
+            seen.add(n)
+            ranked.append({"node_id": n, "name": view.field(n, "name") or n,
+                           "category": (view.node(n) or {}).get("category"),
+                           "description": (view.field(n, "description") or "")[:160],
+                           "reason": reason, "rank": rank, "score": score})
+
         for n in view.nodes():
-            names = [n, view.field(n, "name") or ""] + (view.field(n, "aliases", []) or [])
-            if any(q == str(x).lower() or q in str(x).lower() for x in names if x):
+            name = (view.field(n, "name") or "").lower()
+            aliases = [str(a).lower() for a in (view.field(n, "aliases", []) or [])]
+            in_names = any(q == x or q in x for x in [n.lower(), name] + aliases if x)
+            if in_names:                          # the dupe-gate lane (unchanged)
                 hits.append({"node_id": n, "category": view.node(n)["category"]})
+            if q in (n.lower(), name):
+                add(n, "exact", 0)
+            elif any(q == a for a in aliases):
+                add(n, "alias", 0)
+            elif n.lower().startswith(q) or name.startswith(q):
+                add(n, "prefix", 1)
+            elif in_names:
+                add(n, "name contains", 2)
+            elif q in (view.field(n, "description") or "").lower():
+                add(n, "in description", 3)
         try:
             embeds.refresh(self.pg, view)
             semantic = embeds.semantic_search(self.pg, view, query)
         except Exception as e:                     # gate degrades, never blocks
             semantic = []
             print(f"semantic lane unavailable: {e}")
+        for s in semantic:
+            add(s["node_id"], "similar", 4, s["score"])
+        ranked.sort(key=lambda r: (r["rank"], -(r["score"] or 1.0), r["node_id"]))
         with self.pg.conn.cursor() as c:
             c.execute("INSERT INTO search_receipts (query, results, issued_to) "
                       "VALUES (%s,%s,%s) RETURNING receipt_id",
@@ -181,7 +216,8 @@ class Service:
                        Jsonb(identity)))
             rid = c.fetchone()[0]
         self.pg.conn.commit()
-        return {"receipt": rid, "matches": hits, "semantic": semantic}
+        return {"receipt": rid, "matches": hits, "semantic": semantic,
+                "results": ranked[:12]}
 
     def list_nodes(self, token, category=None, k=500):
         """Browse affordance (agent friction #1b): the graph is enumerable."""

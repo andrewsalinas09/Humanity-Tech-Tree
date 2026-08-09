@@ -327,10 +327,21 @@ def node_card(node_id: str, k: int = 9):
                                           or c.get("source")),
                           "locator": c.get("locator")})
 
+    attrs = {k[1][6:]: v[1] for k, v in view._fields.items()
+             if k[0] == node_id and k[1].startswith("attrs.")}
+    with _get_pg().conn.cursor() as c:
+        c.execute("SELECT author->>'id', wall_time FROM facts "
+                  "WHERE kind='node.create' AND body->>'node_id'=%s", (node_id,))
+        row = c.fetchone()
+    provenance = ({"by": row[0], "at": row[1].date().isoformat()}
+                  if row else None)
     return {
         "node": n,
         "name": view.field(node_id, "name") or node_id,
         "category": n.get("category", "TECHNOLOGY"),
+        "attributes": attrs,
+        "provenance": provenance,
+        "epistemic": view.field(node_id, "epistemic"),
         "description": view.field(node_id, "description"),
         "aliases": view.field(node_id, "aliases", []) or [],
         "validity": view.field(node_id, "validity") or "unassessed",
@@ -346,6 +357,35 @@ def node_card(node_id: str, k: int = 9):
             [{"node_id": v, "year": y} for v, (f, y) in st["vmap"].items()
              if f == node_id], key=lambda r: r["year"]),
         "position": st["pos"].get(node_id),
+    }
+
+
+@app.get("/edge/{edge_id}")
+def edge_card(edge_id: str):
+    """Edges are first-class clickables: the claim, its texture, its history."""
+    st = _state()
+    view = st["view"]
+    e = view.edge(edge_id)
+    if e is None:
+        return {"missing": edge_id}
+    with _get_pg().conn.cursor() as c:
+        c.execute("SELECT author->>'id', wall_time FROM facts "
+                  "WHERE kind='edge.create' AND body->>'edge_id'=%s", (edge_id,))
+        row = c.fetchone()
+    sd = view.field(edge_id, "start_date") or {}
+    return {
+        "edge_id": edge_id, "type": e["type"],
+        "qualifier": e.get("qualifier") or "",
+        "from": e["from"], "from_name": view.field(e["from"], "name") or e["from"],
+        "to": e["to"], "to_name": view.field(e["to"], "name") or e["to"],
+        "justification": view.field(edge_id, "justification"),
+        "year": sd.get("year"),
+        "epistemic": view.field(edge_id, "epistemic"),
+        "constraints": view.field(edge_id, "constraints", []) or [],
+        "shadowed_by": view.shadowed_by(edge_id),
+        "citation": view.field(edge_id, "citation"),
+        "provenance": ({"by": row[0], "at": row[1].date().isoformat()}
+                       if row else None),
     }
 
 
@@ -392,19 +432,15 @@ def solve(node_id: str, world_time: float = None, region: str = None):
 
 
 @app.get("/search")
-def search(q: str):
-    """Name/alias search → positions, for the upper-right search box."""
+def search(q: str, token: str = "tok-andrew"):
+    """ONE search behind every surface (unified-front-door ruling): the
+    service's ranked two-lane search, plus map positions for navigation."""
     st = _state()
-    view, pos = st["view"], st["pos"]
-    ql = q.lower()
-    hits = []
-    for n in view.nodes():
-        names = [n, view.field(n, "name") or ""] + (view.field(n, "aliases", []) or [])
-        if any(ql in str(x).lower() for x in names if x):
-            p = pos.get(n)
-            hits.append({"node_id": n, "name": view.field(n, "name") or n,
-                         "lng": p[0] if p else 0, "lat": p[1] if p else 0})
-    return {"hits": hits[:10]}
+    out = _get_svc().search_similar(token, q)
+    for r in out["results"]:
+        p = st["pos"].get(r["node_id"])
+        r["lng"], r["lat"] = (p[0], p[1]) if p else (None, None)
+    return out
 
 
 # -- requests (Bounties tab): thin REST proxy over the Service ---------------

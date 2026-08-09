@@ -14,6 +14,8 @@ type EdgeView = {
 };
 type Card = {
   name: string; category: string; description?: string;
+  attributes?: Record<string, any>;
+  provenance?: { by: string; at: string } | null; epistemic?: string;
   aliases: string[]; validity: string; cited: boolean;
   citations: { claim: string; source: string; source_name: string;
                locator?: string }[];
@@ -62,7 +64,6 @@ export default function Home() {
   const [solving, setSolving] = useState(false);
   const [seq, setSeq] = useState(0);
   const [tab, setTab] = useState("Explore");
-  const [q, setQ] = useState("");
   const [reqs, setReqs] = useState<any[]>([]);
   const [board, setBoard] = useState<any[]>([]);
   const [form, setForm] = useState({ want: "WANT_NODE", subject_node: "",
@@ -404,13 +405,24 @@ export default function Home() {
     });
     map.on("click", "nodes", (e) => {
       const id = e.features?.[0]?.properties?.node_id;
-      if (id) focusOn(map, id);
+      if (id) { setEdgeCard(null); focusOn(map, id); }
     });
     map.on("click", (e) => {
       const hits = map.queryRenderedFeatures(e.point, { layers: ["nodes"] });
-      if (!hits.length) { clearDim(map); setCard(null); setSel(null); setSolve(null);
-                          selRef.current = null;
-                          focusRef.current = null; applyFilters(map); }
+      if (hits.length) return;
+      // edges are first-class clickables (padded hitbox for thin lines)
+      const p = e.point, pad = 6;
+      const edges = map.queryRenderedFeatures(
+        [[p.x - pad, p.y - pad], [p.x + pad, p.y + pad]],
+        { layers: ["edges", "edges-ghost"] });
+      const eid = edges[0]?.properties?.edge_id;
+      if (eid && !String(eid).endsWith("~lift")) {
+        openEdge(String(eid));
+        return;
+      }
+      clearDim(map); setCard(null); setSel(null); setSolve(null);
+      selRef.current = null; setEdgeCard(null);
+      focusRef.current = null; applyFilters(map);
     });
     map.on("mouseenter", "nodes", () => (map.getCanvas().style.cursor = "pointer"));
     map.on("mouseleave", "nodes", () => (map.getCanvas().style.cursor = ""));
@@ -438,15 +450,92 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const doSearch = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-    const { hits } = await (await fetch(
-      `${TILER}/search?q=${encodeURIComponent(q)}`)).json();
-    const map = mapRef.current;
-    if (hits.length && map) {
-      map.flyTo({ center: [hits[0].lng, hits[0].lat], zoom: 5 });
-      focusOn(map, hits[0].node_id);
+  // ---- THE search: one component behind every surface ---------------------
+  const SearchBox = ({ placeholder, onPick, onCreate, compact }: {
+    placeholder: string;
+    onPick: (r: any, full: any) => void;
+    onCreate?: (text: string, full: any) => void;
+    compact?: boolean;
+  }) => {
+    const [text, setText] = useState("");
+    const [res, setRes] = useState<any | null>(null);
+    const timer = useRef<any>(null);
+    const change = (v: string) => {
+      setText(v);
+      clearTimeout(timer.current);
+      if (!v.trim()) { setRes(null); return; }
+      timer.current = setTimeout(async () => {
+        setRes(await (await fetch(
+          `${TILER}/search?q=${encodeURIComponent(v)}`)).json());
+      }, 250);
+    };
+    const close = () => { setRes(null); setText(""); };
+    return (
+      <div style={{ position: "relative" }}>
+        <input value={text} onChange={(e) => change(e.target.value)}
+               placeholder={placeholder}
+               style={compact ? S.input : S.searchInput} />
+        {res && text.trim() && (
+          <div style={S.dropdown}>
+            {res.results.map((r: any) => (
+              <div key={r.node_id} style={S.resultRow}
+                   onClick={() => { onPick(r, res); close(); }}>
+                <b>{r.name}</b>{" "}
+                <small style={{ opacity: 0.55 }}>
+                  {(r.category ?? "").toLowerCase().replace(/_/g, " ")} ·{" "}
+                  {r.reason}{r.score ? ` ${r.score}` : ""}
+                </small>
+                {r.description &&
+                  <div style={{ fontSize: 11.5, opacity: 0.6 }}>
+                    {r.description}</div>}
+              </div>))}
+            {res.results.length === 0 &&
+              <div style={{ padding: "6px 10px", fontSize: 12.5,
+                            opacity: 0.6 }}>nothing matches</div>}
+            {onCreate && (
+              <div style={{ ...S.resultRow, color: "#2f6fd0", fontWeight: 600 }}
+                   onClick={() => { onCreate(text.trim(), res); close(); }}>
+                ➕ Create “{text.trim()}”…
+              </div>)}
+          </div>)}
+      </div>
+    );
+  };
+
+  const [edgeCard, setEdgeCard] = useState<any | null>(null);
+  const openEdge = async (eid: string) => {
+    const d = await (await fetch(`${TILER}/edge/${eid}`)).json();
+    if (!d.missing) { setCard(null); setSel(null); selRef.current = null;
+                      setEdgeCard(d); setTab("Explore"); }
+  };
+  const edgeAction = async (kind: "cite" | "dispute" | "delete") => {
+    const eid = edgeCard?.edge_id;
+    if (!eid) return;
+    if (kind === "cite") {
+      const source = window.prompt("Source (doc-id / URL / reference):");
+      if (!source) return;
+      const locator = window.prompt("Locator (page, section — be precise):") ?? undefined;
+      const res = await api("/verb", { name: "attach_citation",
+        params: { assertion_id: eid, source_node: source, locator } });
+      alert(res.applied ? "Cited." : JSON.stringify(res.rejected ?? res));
+    } else if (kind === "dispute") {
+      const grounds = window.prompt("What's wrong with this link? (grounds)");
+      if (!grounds) return;
+      const res = await api("/challenges", { subject: eid, grounds });
+      alert(res.challenge ? `Challenge ${res.challenge} opened.` : JSON.stringify(res));
+    } else {
+      const reason = window.prompt("Reason for deletion request (admin approves):");
+      if (!reason) return;
+      const res = await api("/delete-request", { subject_id: eid, reason });
+      alert(res.ticket ? `Delete ticket #${res.ticket} opened.` : JSON.stringify(res));
     }
+    openEdge(eid);
+  };
+
+  const startCreate = (name: string, gateFull: any) => {
+    setTab("Explore"); setShowAdd(true);
+    setAdd({ ...add, name });
+    setGateRes(gateFull);            // the search WAS the gate — receipt in hand
   };
 
   const S = styles;
@@ -795,13 +884,66 @@ export default function Home() {
                 </div>))}
             </div>
           )}
+          {tab === "Explore" && !showAdd && edgeCard && (
+            <div>
+              <h3 style={{ margin: "0 0 4px" }}>
+                <span style={S.link}
+                      onClick={() => { setEdgeCard(null);
+                        mapRef.current && focusOn(mapRef.current, edgeCard.from); }}>
+                  {edgeCard.from_name}</span>
+                {" → "}
+                <span style={S.link}
+                      onClick={() => { setEdgeCard(null);
+                        mapRef.current && focusOn(mapRef.current, edgeCard.to); }}>
+                  {edgeCard.to_name}</span>
+              </h3>
+              <p style={{ margin: "2px 0 8px" }}>
+                <Chip ok label={edgeCard.type.toLowerCase().replace(/_/g, " ")} />{" "}
+                {edgeCard.qualifier && <Chip ok label={edgeCard.qualifier} />}{" "}
+                {edgeCard.year && <Chip ok label={`${Math.trunc(edgeCard.year)}`} />}{" "}
+                <Chip ok={!!edgeCard.citation}
+                      label={edgeCard.citation ? "cited" : "needs citation"} />
+              </p>
+              {edgeCard.justification &&
+                <p style={S.desc}>“{edgeCard.justification}”</p>}
+              {edgeCard.citation &&
+                <div style={{ fontSize: 12, opacity: 0.7, margin: "4px 0" }}>
+                  📖 {edgeCard.citation.source}
+                  {edgeCard.citation.locator ? ` — ${edgeCard.citation.locator}` : ""}
+                </div>}
+              {edgeCard.shadowed_by.length > 0 &&
+                <div style={{ fontSize: 12, opacity: 0.65 }}>
+                  shadowed by: {edgeCard.shadowed_by.join(", ")} (covered history)
+                </div>}
+              {edgeCard.constraints.length > 0 && (
+                <div style={{ fontSize: 12.5, margin: "6px 0" }}>
+                  {edgeCard.constraints.map((c: any, i: number) => (
+                    <div key={i}>⚖ {c.attr} {c.op} {String(c.value)}{" "}
+                      <small style={{ opacity: 0.5 }}>{c.class}</small></div>))}
+                </div>)}
+              {edgeCard.epistemic &&
+                <div style={{ fontSize: 12, opacity: 0.65 }}>
+                  epistemic: {edgeCard.epistemic}</div>}
+              {edgeCard.provenance &&
+                <div style={{ fontSize: 11.5, opacity: 0.5, margin: "6px 0" }}>
+                  claimed by {edgeCard.provenance.by} · {edgeCard.provenance.at}
+                  {" · "}{edgeCard.edge_id}
+                </div>}
+              <div style={{ marginTop: 8 }}>
+                <button onClick={() => edgeAction("cite")} style={S.miniBtn}>📖 cite</button>
+                <button onClick={() => edgeAction("dispute")} style={S.miniBtn}>⚑ dispute</button>
+                <button onClick={() => edgeAction("delete")} style={S.miniBtn}>🗑 delete</button>
+                <button onClick={() => setEdgeCard(null)} style={S.miniBtn}>close</button>
+              </div>
+            </div>
+          )}
           {!["Bounties", "Leaders", "Changes", "Tickets"].includes(tab)
-            && !showAdd && !card &&
-            <p style={{ opacity: 0.6 }}>Click a node — or search, upper
-            right. Red ring = needs citation. Faded = nobody vouched yet.
+            && !showAdd && !card && !edgeCard &&
+            <p style={{ opacity: 0.6 }}>Click a node or an edge — or search,
+            upper right. Red ring = needs citation. Faded = nobody vouched yet.
             Everything builds from zero.</p>}
           {!["Bounties", "Leaders", "Changes", "Tickets"].includes(tab)
-            && !showAdd && card && !card.missing && (
+            && !showAdd && !edgeCard && card && !card.missing && (
             <div>
               {card.image_url &&
                 <img src={card.image_url} alt="" style={S.img} />}
@@ -819,6 +961,20 @@ export default function Home() {
                 ? <p style={S.desc}>{card.description}</p>
                 : <p style={{ ...S.desc, opacity: 0.45, fontStyle: "italic" }}>
                     No description yet — this node needs one.</p>}
+              {Object.keys(card.attributes ?? {}).length > 0 && (
+                <div style={{ fontSize: 12.5, margin: "4px 0" }}>
+                  {Object.entries(card.attributes!).map(([k, v]) => (
+                    <span key={k} style={{ marginRight: 10 }}>
+                      <b>{k.replace(/_/g, " ")}</b>: {String(v)}
+                    </span>))}
+                </div>)}
+              {card.epistemic &&
+                <div style={{ fontSize: 12, opacity: 0.65 }}>
+                  epistemic: {card.epistemic}</div>}
+              {card.provenance && (
+                <div style={{ fontSize: 11.5, opacity: 0.5, margin: "2px 0 6px" }}>
+                  added by {card.provenance.by} · {card.provenance.at}
+                </div>)}
               {card.citations.length > 0 && (
                 <div style={{ fontSize: 12, margin: "6px 0" }}>
                   {card.citations.map((c, i) => (
@@ -885,9 +1041,17 @@ export default function Home() {
                           onChange={(e) => setLink({ ...link, rel: e.target.value })}>
                     {Object.keys(REL).map((r) => <option key={r}>{r}</option>)}
                   </select>
-                  <input placeholder="target node id (e.g. transistor)"
-                         value={link.target} style={S.input}
-                         onChange={(e) => setLink({ ...link, target: e.target.value })} />
+                  {link.target ? (
+                    <div style={{ margin: "6px 0" }}>
+                      <Chip ok label={link.target} />{" "}
+                      <button style={S.miniBtn}
+                              onClick={() => setLink({ ...link, target: "" })}>
+                        ✕ change</button>
+                    </div>
+                  ) : (
+                    <SearchBox compact placeholder="find the target node…"
+                      onPick={(r) => setLink({ ...link, target: r.node_id })} />
+                  )}
                   <input placeholder="justification (why this link is true)"
                          value={link.just} style={S.input}
                          onChange={(e) => setLink({ ...link, just: e.target.value })} />
@@ -934,10 +1098,15 @@ export default function Home() {
         </aside>
         <div style={{ position: "relative", flex: 1 }}>
           <div ref={mapDiv} style={{ position: "absolute", inset: 0 }} />
-          <form onSubmit={doSearch} style={S.search}>
-            <input value={q} onChange={(e) => setQ(e.target.value)}
-                   placeholder="Search the tree…" style={S.searchInput} />
-          </form>
+          <div style={S.search}>
+            <SearchBox placeholder="Search — or create…"
+              onPick={(r) => { const map = mapRef.current;
+                if (map && r.lng != null) {
+                  map.flyTo({ center: [r.lng, r.lat], zoom: 5 });
+                  focusOn(map, r.node_id);
+                } }}
+              onCreate={startCreate} />
+          </div>
         </div>
       </main>
     </div>
@@ -988,8 +1157,14 @@ const styles: Record<string, React.CSSProperties> = {
              marginRight: 6 },
   solveBox: { padding: "10px 12px", borderRadius: 10, background: "#f6f8fb",
               border: "1px solid #e4e8ef", margin: "6px 0" },
-  search: { position: "absolute", top: 12, right: 12, zIndex: 5 },
-  searchInput: { padding: "8px 12px", borderRadius: 10, width: 240,
+  search: { position: "absolute", top: 12, right: 12, zIndex: 5, width: 300 },
+  searchInput: { padding: "8px 12px", borderRadius: 10, width: "100%",
                  border: "1px solid #cfd6e0", background: "#fff", fontSize: 14,
                  boxShadow: "0 2px 8px rgba(20,30,50,.08)" },
+  dropdown: { position: "absolute", top: "105%", left: 0, right: 0, zIndex: 20,
+              background: "#fff", border: "1px solid #cfd6e0", borderRadius: 10,
+              boxShadow: "0 6px 24px rgba(20,30,50,.14)", maxHeight: 380,
+              overflowY: "auto" },
+  resultRow: { padding: "7px 10px", cursor: "pointer", fontSize: 13.5,
+               borderBottom: "1px solid #eef1f6" },
 };
