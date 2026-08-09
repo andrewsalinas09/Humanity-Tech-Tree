@@ -219,8 +219,8 @@ Two concurrent merge CRs commit A->B and B->A; redirect chains loop.
 **Answer:** H4 — redirect acyclicity is the fourth circuit breaker: follow-to-fixpoint at apply time; cycles are true conflicts routed to review. **Status:** Solved (design).
 
 ### TB-051 — The wrong merge, one year later
-Two genuinely different things were merged; a year of post-merge edits tangled onto the canonical node.
-**Answer:** H5 — the Un-merge verb: forward-edit redirect reversal + triage of post-merge assertions (keep / move / park-at-LCA, ambiguity parks). **Status:** Solved (design).
+Two genuinely different things were merged; a year of post-merge edits tangled onto the canonical node. Recovery must be fast (merge history as prior), honest (stale verification must not survive), and never forcing (ambiguity parks).
+**Answer:** H5/H5a-c — Un-merge verb: forward-edit redirect reversal; pre-merge assertions auto-propose their recorded original homes (only post-merge ones need judgment); rehomed assertions keep citations but shed verification events → recompute to ~L2 → machine re-verify → bounty re-climb to L4/L5; ambiguity parks at any common ancestor, or as an unplaced-claim bounty when none exists. **Status:** Solved (design).
 
 ### TB-052 — Merging two family roots with full pockets
 Both roots carry iteration records, version nodes, aliases.
@@ -269,3 +269,7 @@ An operator runs 40 honest-behaving agent identities that satisfy "N independent
 ### TB-063 — Smartphone: type of phone AND type of computer
 Poly-hierarchy is legal, so inheritance flows from two parents; widening's "the LCA" is ambiguous between incomparable ancestors.
 **Answer:** H17 — taxonomy is a DAG; effective requirements = AND across all parents (tightening-dedup for same-role); WIDEN targets any common ancestor, the choice being editorial (Q-14). **Status:** Solved (design).
+
+### TB-064 — Two schools, one gunpowder
+Diffusionist and independent-invention schools assert competing transmission structures for the same technology; both are organized communities with literatures; neither may be structurally favored.
+**Answer:** ADR-0036 — identical authoring standing and rules for both; competing claims as parallel cited edges (the Thera pattern); separation happens only through evidence-computed levels and confidence; moderation touches process, never verdicts; rankings are traceable so bias claims are answered with traces. Neutrality of rules, not outcomes — no false balance. **Status:** Solved (design).
