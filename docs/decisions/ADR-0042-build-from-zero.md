@@ -13,6 +13,13 @@ Defaults are silent claims. The old schema defaulted edge epistemic status to MA
 3. **Q1 companion (creation ergonomics):** creation verbs accept the initial conditions as optional kwargs — dates, epistemic, qualifier, justification — compiling ONE atomic ChangeRequest, so an edge can be *born complete* (the fringe claim born FRINGE; the 2010 camera edge born dated) instead of passing through a sloppy bare state. What isn't stated at birth simply starts at zero, honestly labeled.
 4. **Justification: never required, always encouraged** (Q3 ruling) — a kwarg on every verb, demanded only where the law already demands it (L3 person links, exclusions, PHYSICAL constraints via citation), encouraged via tool instructions rather than per-call nagging.
 
+## The blame corollary (user, same day)
+"If an agent/person didn't personally vouch for the info, it's not there. We assign blame to people, not defaults." Every unit of standing must trace to an identity who explicitly asserted it and can be credited or slashed for it (ADR-0013 reputation, ADR-0029 provenance, ADR-0041 stamping). Consequences:
+- **Default parameters are defaults in disguise**: a verb signature that fills in `validity="current_truth"` makes the caller vouch without deciding — inadmissible. Public-surface verbs take `validity=None` etc.; unstated stays absent.
+- **Verb-compiled derived facts** (alias unions, expression rewrites, lifted edges) are owned by the invoking identity — you called the compiler, you own its output.
+- **Decision resolutions** are owned by the resolver (`resolved_by`).
+- The audit question "who said this?" has a non-empty answer for every fact, forever — no fact's provenance ever resolves to "the system assumed."
+
 ## Why
 At swarm scale, defaults multiply by millions: a credibility default is a credibility *printing press*. Build-from-zero makes the graph's entire trust surface monotone-honest — everything starts as visibly unestablished and climbs only by recorded acts, which is also exactly what makes the "watch it ripen from red to green" experience true rather than cosmetic.
 

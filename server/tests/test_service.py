@@ -48,12 +48,30 @@ def test_identity_is_stamped_server_side(svc):
 
 
 def test_budget_enforced(svc):
-    svc.create_identity("tok-tiny", {"type": "agent", "id": "tiny"}, budget_per_hour=3)
+    svc.create_identity("tok-tiny", {"type": "agent", "id": "tiny"}, budget_per_hour=2)
     r = svc.search_similar("tok-tiny", "aaa")
-    svc.propose_node("tok-tiny", "Aaa", search_receipt=r["receipt"])   # writes 3 facts
+    svc.propose_node("tok-tiny", "Aaa", search_receipt=r["receipt"])   # writes 2 facts
     with pytest.raises(BudgetExceeded):
         r2 = svc.search_similar("tok-tiny", "bbb")
         svc.propose_node("tok-tiny", "Bbb", search_receipt=r2["receipt"])
+
+
+def test_blame_corollary_no_default_vouching(svc):
+    """Unstated validity stays ABSENT: the node stands at UNKNOWN until someone
+    personally vouches — no parameter default ever vouches for the caller."""
+    r = svc.search_similar("tok-agent", "widget")
+    svc.propose_node("tok-agent", "Widget", search_receipt=r["receipt"])
+    assert svc.solve("tok-agent", "widget")["existence"] == "UNKNOWN"
+    out = svc.execute("tok-andrew", "correct",
+                      {"subject": "widget", "fld": "validity",
+                       "new_value": "current_truth",
+                       "justification": "verified it exists"})
+    assert "applied" in out
+    assert svc.solve("tok-andrew", "widget")["existence"] == "SATISFIED"
+    with svc.pg.conn.cursor() as c:                            # blame is assigned
+        c.execute("SELECT author->>'id' FROM facts WHERE "
+                  "body->>'field'='validity' AND body->>'subject'='widget'")
+        assert c.fetchone()[0] == "andrew"                     # a PERSON vouched
 
 
 def test_the_gate_is_unskippable(svc):

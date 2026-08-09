@@ -43,6 +43,9 @@ class Store:
         return s
 
     # -- authoring helpers (identity creation + field assertions) -----------
+    # NOTE: the validity default here is TEST SCAFFOLDING standing in for an
+    # explicit author choice. The public surface (propose_node) has NO default:
+    # unstated validity stays absent — blame corollary, ADR-0042.
     def create_node(self, node_id, category="TECHNOLOGY", validity="current_truth"):
         self.append("node.create", {"node_id": node_id, "category": category})
         self.assert_field(node_id, "validity", validity)

@@ -161,7 +161,7 @@ class Service:
 
     # -- writes ---------------------------------------------------------------
     def propose_node(self, token, name, category="TECHNOLOGY",
-                     validity="current_truth", search_receipt=None,
+                     validity=None, search_receipt=None,
                      duplicate_resolution=None, node_id=None):
         """The gate is unskippable by construction: a receipt for a matching query
         is REQUIRED; exact matches force a Decision (use-existing vs create-anyway)."""
@@ -193,11 +193,14 @@ class Service:
             return {"applied": {"existing": duplicate_resolution["node_id"],
                                 "facts_written": 0}}
         nid = node_id or name.lower().replace(" ", "-")
-        return self._apply(identity, [
-            ("node.create", {"node_id": nid, "category": category}),
-            ("assert", {"subject": nid, "field": "validity", "value": validity}),
-            ("assert", {"subject": nid, "field": "name", "value": name}),
-        ], notes=[])
+        facts = [("node.create", {"node_id": nid, "category": category}),
+                 ("assert", {"subject": nid, "field": "name", "value": name})]
+        if validity is not None:                   # blame corollary (ADR-0042):
+            facts.append(("assert", {"subject": nid, "field": "validity",
+                                     "value": validity}))
+        # unstated validity stays ABSENT — the node stands at UNKNOWN until
+        # someone personally vouches; no default ever vouches for the caller.
+        return self._apply(identity, facts, notes=[])
 
     def execute(self, token, verb, params):
         identity, budget = self.authenticate(token)
