@@ -93,6 +93,10 @@ Template:
 **Done:** User articulated the end-to-end authoring experience ("add iPhone → lands red → parallel rabbit holes → sources solidify → never shrinks, only grows → hyper-parallelizable"); every beat maps to existing law (0030 land-red, 0023 collide-never, 0032 red-ripens-green, append-only monotone growth). Added as a VISION section in the user's own framing. Noted homepage idea: record-time time-lapse of subtrees blooming red and ripening green — "watching humanity verify its own knowledge in real time."
 **Next:** unchanged — SCHEMA.md review pending.
 
+## 2026-08-10 (cont.) — Constraint propagation walked (TB-065, the two-path Logic Gate)
+**Done:** User asked how iPhone constraints "bubble up" when Logic Gate gains OR(Transistor, Vacuum Tube). Corrected the mental model: nothing bubbles up — demand flows DOWN translating at each hop (ADR-0005 + Bag of Rules), attributes flow UP composing (ADR-0004), branches die per-query at the colliding seam; pruning is an entailment, never stored (iPhone → transistors, ENIAC-1946 → tubes, same graph, both true). Pinned the three-mechanism preference order: gatekeeper topology (no math) > per-unit seam constraints (no aggregation) > aggregate simulation (needs Q-10 quantities — deferred; design never depends on it). New worked example `docs/examples/constraint-propagation-worked-example.md`; TB-065 added+Solved.
+**Next:** SCHEMA.md review still pending.
+
 ## 2026-08-10 (cont.) — Intercept walked concretely; two-outcome nuance pinned
 **Done:** User asked how adding a node between CPU and transistor works. Walked the full Intercept flow in SCHEMA.md vocabulary (search_similar → propose_node red → one CR: two edges + shadow-mark on the original; iPhone untouched; no level reset; H12 keeps expressions whole; fully order-independent and fractal). Pinned the nuance the question exposed: Intercept has two outcomes by the original edge's truth-status — true-but-coarse → SHADOW (never archive), wrong-target → archive. Glossary entry added.
 **Next:** SCHEMA.md review pending.
