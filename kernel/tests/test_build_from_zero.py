@@ -27,7 +27,7 @@ def test_unstated_epistemic_is_absent_not_mainstream():
     """No credibility freebies: absence stays absent (renders as 'unassessed')."""
     s = Store()
     s.create_node("aliens"); s.create_node("pyramids")
-    add_component(V(s), whole="pyramids", part="aliens_tech", edge_id="e_x").apply(s)
+    add_component(V(s), whole="pyramids", part="aliens", edge_id="e_x").apply(s)
     assert V(s).field("e_x", "epistemic") is None              # zero, honestly
 
 

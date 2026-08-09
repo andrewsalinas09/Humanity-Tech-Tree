@@ -106,10 +106,17 @@ export default function Home() {
   };
 
   // ---- authoring client (every server capability, FE-accessible) ----------
-  const api = async (path: string, body: any) =>
-    (await fetch(`${TILER}${path}`, { method: "POST",
+  const api = async (path: string, body: any) => {
+    const r = await fetch(`${TILER}${path}`, { method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body) })).json();
+      body: JSON.stringify(body) });
+    if (!r.ok) {                    // a 500 must NEVER look like success
+      const txt = await r.text();
+      alert(`Server error (${r.status}): ${txt.slice(0, 200)}`);
+      throw new Error(txt);
+    }
+    return r.json();
+  };
 
   const [showAdd, setShowAdd] = useState(false);
   const [add, setAdd] = useState({ name: "", category: "TECHNOLOGY",
@@ -173,10 +180,26 @@ export default function Home() {
     "is associated with": (s, t) => ({ name: "associate", params: { a: s, b: t, qualifier: "related" } }),
   };
 
+  const resolveTarget = async (text: string): Promise<string | null> => {
+    // typed names resolve to exact ids ('CPU' → cpu); unknowns get suggestions
+    const g = await api("/gate", { query: text });
+    const exact = g.matches.find((m: any) =>
+      m.node_id.toLowerCase() === text.toLowerCase());
+    if (exact) return exact.node_id;
+    if (g.matches.length === 1) return g.matches[0].node_id;
+    const sug = [...g.matches.map((m: any) => m.node_id),
+                 ...(g.semantic ?? []).slice(0, 3).map((s: any) => s.node_id)];
+    alert(`No node '${text}'. ${sug.length ? "Did you mean: " + sug.join(", ")
+                                           : "Create it first (+ Add node)."}`);
+    return null;
+  };
+
   const submitLink = async () => {
     const self = selRef.current;
     if (!self || !link.target.trim()) return;
-    const mk = REL[link.rel](self, link.target.trim());
+    const target = await resolveTarget(link.target.trim());
+    if (!target) return;
+    const mk = REL[link.rel](self, target);
     const params: any = { ...mk.params };
     if (link.just && ["add_enabler", "add_component", "add_ingredient"]
         .includes(mk.name)) params.justification = link.just;

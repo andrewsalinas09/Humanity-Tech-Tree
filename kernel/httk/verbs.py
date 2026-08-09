@@ -117,10 +117,22 @@ def _cat(view, node_id):
     return n["category"] if n else None
 
 
+def _endpoints_exist(view, *node_ids):
+    """Never wrong: an edge to a nonexistent id is a claim about NOTHING —
+    reject with the missing ids named (the 'CPU' vs 'cpu' bug, 2026-08-09)."""
+    missing = [n for n in node_ids if not view.node(n)]
+    if missing:
+        return Rejection("E404", f"unknown node(s): {', '.join(missing)} — "
+                                 "ids are exact (search first)")
+    return None
+
+
 # ------------------------------------------------------- role-named verbs ----
 
 def add_component(view, whole, part, role=None, edge_id=None,
                  start=None, end=None, epistemic=None, justification=None):
+    if (r := _endpoints_exist(view, whole, part)):
+        return r
     if _cat(view, part) in PEOPLE_ORGS:
         return Rejection("L5", f"{part} is a person/org — people are never parts")
     eid = edge_id or f"e_{part}_{whole}"
@@ -132,6 +144,8 @@ def add_component(view, whole, part, role=None, edge_id=None,
 
 def add_ingredient(view, product, ingredient, role=None, edge_id=None,
                    start=None, end=None, epistemic=None, justification=None):
+    if (r := _endpoints_exist(view, product, ingredient)):
+        return r
     if _cat(view, ingredient) in PEOPLE_ORGS:
         return Rejection("L5", f"{ingredient} is a person/org — never an ingredient")
     eid = edge_id or f"e_{ingredient}_{product}"
@@ -143,6 +157,8 @@ def add_ingredient(view, product, ingredient, role=None, edge_id=None,
 
 def add_enabler(view, enabled, enabler, justification=None, edge_id=None,
                 start=None, end=None, epistemic=None):
+    if (r := _endpoints_exist(view, enabled, enabler)):
+        return r
     notes = []
     if _cat(view, enabler) == "WORK_PUBLICATION" and _cat(view, enabled) not in PEOPLE_ORGS:
         notes.append("L1: depend on the concept the work codifies, not the paper")
@@ -166,6 +182,8 @@ def add_enabler(view, enabled, enabler, justification=None, edge_id=None,
 def refine(view, family, version, edge_id=None,
            start=None, end=None, epistemic=None, justification=None):
     """version IS_REFINEMENT_OF family — the flat star (ADR-0018)."""
+    if (r := _endpoints_exist(view, family, version)):
+        return r
     notes = []
     cf, cv = _cat(view, family), _cat(view, version)
     if cf and cv and cf != cv:
@@ -182,6 +200,8 @@ def refine(view, family, version, edge_id=None,
 def succeed(view, old, new, qualifier, edge_id=None,
             start=None, end=None, epistemic=None, justification=None):
     """old SUCCEEDS new (dated story: replaced/superseded/spun-off/rebranded...)."""
+    if (r := _endpoints_exist(view, old, new)):
+        return r
     eid = edge_id or f"s_{old}_{new}"
     e = {"edge_id": eid, "from": old, "to": new, "type": "SUCCEEDS",
          "qualifier": qualifier}
@@ -192,6 +212,8 @@ def succeed(view, old, new, qualifier, edge_id=None,
 def associate(view, a, b, qualifier, edge_id=None,
               start=None, end=None, epistemic=None, justification=None):
     """Ghost-layer story edge (solver-invisible by type)."""
+    if (r := _endpoints_exist(view, a, b)):
+        return r
     eid = edge_id or f"a_{a}_{b}"
     e = {"edge_id": eid, "from": a, "to": b, "type": "ASSOCIATION",
          "qualifier": qualifier}
@@ -200,6 +222,8 @@ def associate(view, a, b, qualifier, edge_id=None,
 
 
 def classify(view, instance, type_, edge_id=None):
+    if (r := _endpoints_exist(view, instance, type_)):
+        return r
     if type_ in (_ancestors(view, instance) | {instance}):
         pass  # re-classification idempotent-ish; DAG check below is the guard
     if instance in _ancestors(view, type_) or instance == type_:
