@@ -18,3 +18,5 @@
 
 ## Why
 Convenience hacks die in place: they work just well enough that replacing them never wins prioritization, until they're the reason the system can't grow. This project's premise is permanence — a graph meant to outlive its tools — so every load-bearing shape gets built once, correctly, and the only cheap starts permitted are the invisibly-swappable kind.
+
+And the user's sharpest formulation: **"having billion scale from the start makes this an actual tool — a thing — not a demo / project."** Demos optimize for the screenshot; tools optimize for the millionth user's ordinary Tuesday. Every architecture choice here is the second kind.
