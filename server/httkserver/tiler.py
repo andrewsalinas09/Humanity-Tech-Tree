@@ -219,7 +219,11 @@ def tile(z: int, x: int, y: int):
                                            or st["vmap"].get(e["to"], (None,))[0]
                                            or ""),
                                "ezmin": max(st["zmin"].get(e["from"], 0),
-                                            st["zmin"].get(e["to"], 0))},
+                                            st["zmin"].get(e["to"], 0)),
+                               # every edge carries the full prop set — an
+                               # absent prop makes ["get"] return null and
+                               # silently fails boolean filters client-side
+                               "lifted": False, "zmax": 99},
             })
     data = mapbox_vector_tile.encode([
         {"name": "edges", "features": edges_feats},
