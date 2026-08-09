@@ -259,6 +259,79 @@ export default function Home() {
     setChallenges(ch);
   };
 
+  const TicketCard = ({ t }: { t: any }) => {
+    // the grouped hoist picker (user ruling: "clustered heavily — everything
+    // goes, or everything minus glass screen"). All checked by default.
+    const shared: any[] = t.evidence?.shared ?? [];
+    const [picked, setPicked] = useState<Set<string>>(
+      new Set(shared.map((s) => s.provider)));
+    const toggle = (p: string) => {
+      const n = new Set(picked);
+      n.has(p) ? n.delete(p) : n.add(p);
+      setPicked(n);
+    };
+    const submitHoist = async () => {
+      const choice = picked.size === shared.length
+        ? { key: "hoist_all" }
+        : picked.size === 0 ? { key: "hoist_none" }
+        : { key: "hoist_only", include: [...picked] };
+      const res = await api(`/tickets/${t.ticket}/resolve`, { choice });
+      if (res.rejected) alert(`${res.rejected.rule}: ${res.rejected.message}`);
+      loadTickets();
+    };
+    const groups = new Map<string, any[]>();
+    for (const s of shared)
+      groups.set(s.category ?? "?", [...(groups.get(s.category ?? "?") ?? []), s]);
+    return (
+      <div style={S.reqBox}>
+        <b>#{t.ticket}</b>{" "}
+        <small style={{ opacity: 0.55 }}>
+          {t.verb} · opened by {t.opened_by}</small>
+        <div style={{ fontSize: 12.5, opacity: 0.8, margin: "3px 0" }}>
+          {t.reason}</div>
+        {t.params && (t.params.parent || t.params.subject || t.params.node_id) &&
+          <div style={{ fontSize: 12, opacity: 0.6 }}>
+            about: {t.params.parent ?? t.params.subject ?? t.params.node_id}
+            {t.params.siblings ? ` ← ${t.params.siblings.join(" + ")}` : ""}
+          </div>}
+        {shared.length > 0 ? (
+          <div style={{ margin: "6px 0" }}>
+            <div style={S.orTitle}>what moves up (uncheck to keep per-instance)</div>
+            {[...groups.entries()].map(([cat, items]) => (
+              <div key={cat} style={{ margin: "4px 0" }}>
+                <small style={{ opacity: 0.5, textTransform: "lowercase" }}>
+                  {cat.replace(/_/g, " ")}</small>
+                {items.map((s) => (
+                  <label key={s.provider}
+                         style={{ display: "block", fontSize: 13.5,
+                                  cursor: "pointer", margin: "2px 0 2px 8px" }}>
+                    <input type="checkbox" checked={picked.has(s.provider)}
+                           onChange={() => toggle(s.provider)} />
+                    {" "}<b>{s.provider}</b>{" "}
+                    <small style={{ opacity: 0.5 }}>
+                      {s.type.toLowerCase().replace(/_/g, " ")}</small>
+                  </label>))}
+              </div>))}
+            <button onClick={submitHoist} style={S.solveBtn}>
+              {picked.size === shared.length
+                ? `Hoist all ${shared.length}`
+                : picked.size === 0 ? "Hoist none (classify only)"
+                : `Hoist ${picked.size} of ${shared.length}`}
+            </button>
+          </div>
+        ) : (
+          <div>
+            {t.options.map((o: any, i: number) => (
+              <button key={i} onClick={() => resolveTicket(t, o)}
+                      style={S.miniBtn}>
+                {o.key}{o.node_id ? `: ${o.node_id}` : ""}
+              </button>))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const resolveTicket = async (t: any, opt: any) => {
     const choice: any = { key: opt.key };
     if (opt.node_id) choice.node_id = opt.node_id;
@@ -820,20 +893,7 @@ export default function Home() {
             <div>
               <h3 style={{ margin: "0 0 4px" }}>Decision tickets</h3>
               {tickets.length === 0 && <p style={{ opacity: 0.5 }}>Queue empty.</p>}
-              {tickets.map((t) => (
-                <div key={t.ticket} style={S.reqBox}>
-                  <b>#{t.ticket}</b>{" "}
-                  <small style={{ opacity: 0.55 }}>{t.verb}</small>
-                  <div style={{ fontSize: 12.5, opacity: 0.8,
-                                margin: "3px 0" }}>{t.reason}</div>
-                  <div>
-                    {t.options.map((o: any, i: number) => (
-                      <button key={i} onClick={() => resolveTicket(t, o)}
-                              style={S.miniBtn}>
-                        {o.key}{o.node_id ? `: ${o.node_id}` : ""}
-                      </button>))}
-                  </div>
-                </div>))}
+              {tickets.map((t) => <TicketCard key={t.ticket} t={t} />)}
               <h3 style={{ margin: "16px 0 4px" }}>Challenges</h3>
               {challenges.length === 0 && <p style={{ opacity: 0.5 }}>No disputes.</p>}
               {challenges.map((c) => (

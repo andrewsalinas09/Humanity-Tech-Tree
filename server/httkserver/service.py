@@ -435,10 +435,12 @@ class Service:
     def open_tickets(self, token):
         self.authenticate(token)
         with self.pg.conn.cursor() as c:
-            c.execute("SELECT ticket_id, verb, reason, options FROM decision_tickets "
+            c.execute("SELECT ticket_id, verb, reason, options, evidence, "
+                      "params, opened_by->>'id' FROM decision_tickets "
                       "WHERE status='open' ORDER BY ticket_id")
-            return [{"ticket": t, "verb": v, "reason": r, "options": o}
-                    for t, v, r, o in c.fetchall()]
+            return [{"ticket": t, "verb": v, "reason": r, "options": o,
+                     "evidence": ev, "params": p, "opened_by": ob}
+                    for t, v, r, o, ev, p, ob in c.fetchall()]
 
     # -- requests (the crowdsourcing loop; user rulings 2026-08-09) ------------
     # Workflow, never facts. Kinds are the arch's own wants: WANT_NODE /
@@ -938,9 +940,11 @@ class Service:
 
     def _open_ticket(self, identity, verb, params, reason, options, evidence=None):
         with self.pg.conn.cursor() as c:
-            c.execute("INSERT INTO decision_tickets (verb, params, reason, options, "
-                      "opened_by) VALUES (%s,%s,%s,%s,%s) RETURNING ticket_id",
-                      (verb, Jsonb(params), reason, Jsonb(options), Jsonb(identity)))
+            c.execute("INSERT INTO decision_tickets (verb, params, reason, "
+                      "options, opened_by, evidence) "
+                      "VALUES (%s,%s,%s,%s,%s,%s) RETURNING ticket_id",
+                      (verb, Jsonb(params), reason, Jsonb(options),
+                       Jsonb(identity), Jsonb(evidence or {})))
             t = c.fetchone()[0]
         self.pg.conn.commit()
         return {"ticket": t, "reason": reason, "options": options,
