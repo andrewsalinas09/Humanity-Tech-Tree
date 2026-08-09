@@ -215,9 +215,10 @@ def test_reputation_and_challenge_loop(svc):
     t = svc.challenge_tally("tok-andrew", cid)
     assert t["votes"][0]["vested"] is False            # <3 verified claims
     # non-admin cannot ratify
-    bad = svc.resolve_challenge("tok-agent", cid, "upheld")
+    bad = svc.resolve_challenge("tok-agent", cid, "upheld", note="agent try")
     assert bad["rejected"]["rule"] == "ADMIN"
-    done = svc.resolve_challenge("tok-andrew", cid, "upheld", demoted=[aid])
+    assert svc.resolve_challenge("tok-andrew", cid, "upheld")["rejected"]["rule"] == "ADR-0049"  # reasonless
+    done = svc.resolve_challenge("tok-andrew", cid, "upheld", demoted=[aid], note="evidence supports the rename")
     assert done["remedy_results"][0]["result"].get("applied")
     _, view = svc._kernel()
     assert "Widget-X" in (view.field("gizmo", "aliases") or [])
