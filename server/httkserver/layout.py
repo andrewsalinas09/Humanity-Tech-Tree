@@ -147,7 +147,7 @@ def compute_layout(view):
              ' label=""];']
     for n in nodes:
         lines.append(f"  {_dot_quote(n)};")
-    edge_ids = []
+    edge_ids, reversed_ids = [], set()
     for n in nodes:
         for e in sorted(view.edges_in(n, None), key=lambda e: e["edge_id"]):
             a, b = e["from"], e["to"]
@@ -159,6 +159,12 @@ def compute_layout(view):
             # their subjects instead of stranding in a far strip, and their
             # dashes route short and direct (user: no loop-the-loop detours)
             attrs += ", weight=2" if hard else ", weight=1"
+            if e["type"] == "IS_TYPE_OF":
+                # taxonomy PARENTS sit ABOVE their instances (user 2026-08-09:
+                # Smartphone landed below the phones) — the edge identity is
+                # instance→parent, but for RANKING the family is the provider
+                a, b = b, a
+                reversed_ids.add(e["edge_id"])
             lines.append(f"  {_dot_quote(a)} -> {_dot_quote(b)} [{attrs}];")
             edge_ids.append(e["edge_id"])
     lines.append("}")
@@ -209,6 +215,8 @@ def compute_layout(view):
         if eid and "pos" in e:
             pl = _spline_to_polyline(e["pos"])
             if len(pl) >= 2:
+                if eid in reversed_ids:      # un-reverse: path must run from→to
+                    pl.reverse()
                 path = [world(x, y) for x, y in pl]
                 a, b = edge_ends.get(eid, (None, None))
                 if a in pos:

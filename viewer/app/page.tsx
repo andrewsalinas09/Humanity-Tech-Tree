@@ -388,6 +388,17 @@ export default function Home() {
   // the focused closure: PINNED VISIBLE at every zoom (user ruling — a
   // clicked path must never disappear when zooming out)
   const focusRef = useRef<{ n: string[]; e: string[] } | null>(null);
+  // shadowed (covered-history) lines: hidden by default, toggle persists
+  const [showShadowed, setShowShadowed] = useState<boolean>(() =>
+    typeof window !== "undefined"
+      && localStorage.getItem("httk.showShadowed") === "1");
+  const showShadowedRef = useRef(showShadowed);
+  const toggleShadowed = () => {
+    const next = !showShadowedRef.current;
+    showShadowedRef.current = next; setShowShadowed(next);
+    localStorage.setItem("httk.showShadowed", next ? "1" : "0");
+    if (mapRef.current) applyFilters(mapRef.current);
+  };
 
   const applyFilters = (map: maplibregl.Map) => {
     if (!map.getLayer("nodes")) return;
@@ -408,7 +419,11 @@ export default function Home() {
         ["in", ["get", "edge_id"], litE]],
       // a manually demerged family retires its lifted stand-in edges
       ["any", ["!", ["get", "lifted"]],
-       ["!", ["in", ["get", "vfamily"], fams]]]] as any;
+       ["!", ["in", ["get", "vfamily"], fams]]],
+      // covered history hides unless toggled on (or lit by a focused closure)
+      ...(showShadowedRef.current ? [] :
+        [["any", ["!", ["get", "shadowed"]],
+          ["in", ["get", "edge_id"], litE]]])] as any;
     map.setFilter("nodes", showNode);
     map.setFilter("node-ring", ["all", ["!", ["get", "cited"]], showNode]);
     map.setFilter("edges", ["all", ["!", ["get", "ghost"]], showEdge]);
@@ -1166,6 +1181,11 @@ export default function Home() {
                   focusOn(map, r.node_id);
                 } }}
               onCreate={startCreate} />
+            <label style={S.mapToggle}>
+              <input type="checkbox" checked={showShadowed}
+                     onChange={toggleShadowed} />
+              {" "}show covered history (dashed)
+            </label>
           </div>
         </div>
       </main>
@@ -1227,4 +1247,8 @@ const styles: Record<string, React.CSSProperties> = {
               overflowY: "auto" },
   resultRow: { padding: "7px 10px", cursor: "pointer", fontSize: 13.5,
                borderBottom: "1px solid #eef1f6" },
+  mapToggle: { display: "block", marginTop: 6, padding: "4px 10px",
+               background: "#fff", border: "1px solid #cfd6e0",
+               borderRadius: 8, fontSize: 12, color: "#5a6577",
+               cursor: "pointer", boxShadow: "0 2px 8px rgba(20,30,50,.08)" },
 };
