@@ -38,12 +38,27 @@ def importance(view):
     return {n: math.log1p(raw[n]) / math.log1p(mx) for n in nodes}
 
 
+def version_map(view):
+    """{version_node: (family, year)} from IS_REFINEMENT_OF edges (ADR-0018).
+    Versions are SATELLITES of their family (user ruling) — they never enter
+    the world layout; they cascade timeline-wise beside their root."""
+    out = {}
+    for n in view.nodes():
+        for e in view.edges_out(n, {"IS_REFINEMENT_OF"}):
+            sd = view.field(e["edge_id"], "start_date") or {}
+            out[n] = (e["to"], sd.get("year", 0))
+            break
+    return out
+
+
 def layered_layout(view):
     """→ {node_id: (lng, lat, layer)}. Layer = longest provider path (hard edges);
-    x = barycenter of providers, ties broken by node_id (deterministic)."""
-    nodes = view.nodes()
+    x = barycenter of providers, ties broken by node_id (deterministic).
+    Version nodes are excluded and attached as timeline cascades afterward."""
+    vmap = version_map(view)
+    nodes = [n for n in view.nodes() if n not in vmap]
     providers = {n: [e["from"] for e in view.edges_in(n, HARD_TYPES | TAXONOMY_TYPES)
-                     if view.node(e["from"])]
+                     if view.node(e["from"]) and e["from"] not in vmap]
                  for n in nodes}
 
     depth = {}
@@ -86,7 +101,21 @@ def layered_layout(view):
             lat = LAT_MAX if max_layer == 0 else (
                 LAT_MAX - (LAT_MAX - LAT_MIN) * ly / max_layer)
             pos[n] = (max(LNG_MIN, min(LNG_MAX, lng)), lat, ly)
-    return _relax(pos, edge_pairs, importance(view))
+    pos = _relax(pos, edge_pairs, importance(view))
+
+    # timeline cascade (user ruling): versions step DOWN AND TO THE RIGHT of
+    # their family root, ordered by date — generations reading like a waterfall
+    by_family = {}
+    for v, (fam, year) in vmap.items():
+        by_family.setdefault(fam, []).append((year, v))
+    for fam, versions in by_family.items():
+        if fam not in pos:
+            continue
+        fx, fy, fl = pos[fam]
+        for i, (year, v) in enumerate(sorted(versions)):
+            pos[v] = (max(LNG_MIN, min(LNG_MAX, fx + 8.0 + 7.0 * i)),
+                      max(LAT_MIN, fy - 4.0 - 5.0 * i), fl)
+    return pos
 
 
 def _relax(pos, edges, imp, iters=260):

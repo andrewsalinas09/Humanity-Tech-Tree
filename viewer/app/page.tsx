@@ -11,6 +11,7 @@ type Card = {
   name: string; validity: string; cited: boolean; image_url?: string;
   requires_count: number; requires: any[];
   enables_count: number; enables: any[]; missing?: string;
+  versions?: { node_id: string; year: number }[];
 };
 type Solve = { existence: string; fitness: string; gaps: [string, string][] };
 
@@ -52,6 +53,29 @@ export default function Home() {
   const [seq, setSeq] = useState(0);
   const [tab, setTab] = useState("Explore");
   const [q, setQ] = useState("");
+  // version families the user has "demerged" — collapsed by default
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const expandedRef = useRef<Set<string>>(expanded);
+
+  const applyExpand = (map: maplibregl.Map, fams: Set<string>) => {
+    if (!map.getLayer("nodes")) return;
+    const list = ["literal", [...fams]] as any;
+    const showNode = ["any", ["!", ["get", "version"]],
+                      ["in", ["get", "family"], list]] as any;
+    const showEdge = ["any", ["==", ["get", "vfamily"], ""],
+                      ["in", ["get", "vfamily"], list]] as any;
+    map.setFilter("nodes", showNode);
+    map.setFilter("node-ring", ["all", ["!", ["get", "cited"]], showNode]);
+    map.setFilter("edges", ["all", ["!", ["get", "ghost"]], showEdge]);
+    map.setFilter("edges-ghost", ["all", ["get", "ghost"], showEdge]);
+  };
+
+  const toggleFamily = (fam: string) => {
+    const next = new Set(expandedRef.current);
+    next.has(fam) ? next.delete(fam) : next.add(fam);
+    expandedRef.current = next; setExpanded(next);
+    if (mapRef.current) applyExpand(mapRef.current, next);
+  };
 
   const clearDim = (map: maplibregl.Map) => {
     map.removeFeatureState({ source: "httk", sourceLayer: "nodes" });
@@ -100,6 +124,7 @@ export default function Home() {
     map.on("load", () => {
       map.addImage("book", bookImage(), { pixelRatio: 2, sdf: true });
       map.addImage("book-ring", bookImage(44, 52, true), { pixelRatio: 2 });
+      applyExpand(map, expandedRef.current);   // versions start tucked in
     });
     map.on("click", "nodes", (e) => {
       const id = e.features?.[0]?.properties?.node_id;
@@ -213,6 +238,25 @@ export default function Home() {
                       <ul>{solve.gaps.slice(0, 12).map(([s, w], i) =>
                         <li key={i} style={{ opacity: 0.8 }}>{s}: {w}</li>)}</ul>
                     </details>)}
+                </div>)}
+              {sel && (card.versions?.length ?? 0) > 0 && (
+                <div style={{ margin: "10px 0" }}>
+                  <button onClick={() => toggleFamily(sel)} style={S.solveBtn}>
+                    {expanded.has(sel)
+                      ? "⊟ Tuck versions back in"
+                      : `⊞ Demerge ${card.versions!.length} versions (timeline)`}
+                  </button>
+                  {expanded.has(sel) && (
+                    <ul style={{ margin: "6px 0 0" }}>
+                      {card.versions!.map((v) => (
+                        <li key={v.node_id} style={S.link}
+                            onClick={() => mapRef.current &&
+                                           focusOn(mapRef.current, v.node_id)}>
+                          {v.node_id}{" "}
+                          <small style={{ opacity: 0.45 }}>
+                            {v.year || "undated"}</small>
+                        </li>))}
+                    </ul>)}
                 </div>)}
               <NeighborList title="requires" items={card.requires}
                             total={card.requires_count} dir="from" />

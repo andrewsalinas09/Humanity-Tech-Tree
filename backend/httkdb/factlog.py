@@ -63,22 +63,24 @@ class PgFactLog:
     def __init__(self, dsn=None):
         self.dsn = dsn or os.environ.get(
             "HTT_PG_DSN", "postgresql://postgres:httk@localhost:5433/httk")
-        self.conn = psycopg.connect(self.dsn, autocommit=False)
+        # autocommit: reads must NEVER leave the connection idle-in-transaction
+        # (a long-lived tiler holding ACCESS SHARE on facts blocks any
+        # ALTER/TRUNCATE forever). Multi-statement writes open explicit
+        # transactions via conn.transaction().
+        self.conn = psycopg.connect(self.dsn, autocommit=True)
 
     # -- lifecycle -----------------------------------------------------------
     def migrate(self, sql_path):
         with open(sql_path, encoding="utf-8") as f:
             sql = f.read()
-        with self.conn.cursor() as cur:
+        with self.conn.transaction(), self.conn.cursor() as cur:
             cur.execute(sql)
-        self.conn.commit()
 
     def wipe(self):
-        with self.conn.cursor() as cur:
+        with self.conn.transaction(), self.conn.cursor() as cur:
             for t in ("citations", "current_fields", "edge_identities",
                       "node_identities", "change_requests", "facts"):
                 cur.execute(f"TRUNCATE {t} RESTART IDENTITY CASCADE")
-        self.conn.commit()
 
     def close(self):
         self.conn.close()
@@ -86,20 +88,19 @@ class PgFactLog:
     # -- ChangeRequests ------------------------------------------------------
     def open_cr(self, proposer=None):
         proposer = proposer or {"type": "system", "id": "ref"}
-        with self.conn.cursor() as cur:
+        with self.conn.transaction(), self.conn.cursor() as cur:
             cur.execute("SELECT COALESCE(MAX(seq),0) FROM facts")
             n = cur.fetchone()[0]
             cr_id = f"cr_{n + 1:06d}_{abs(hash(json.dumps(proposer, sort_keys=True))) % 997}"
             cur.execute(
                 "INSERT INTO change_requests (cr_id, proposer, status) VALUES (%s,%s,'draft')",
                 (cr_id, Jsonb(proposer)))
-        self.conn.commit()
         return ChangeRequest(cr_id, proposer)
 
     def apply(self, cr):
         """One transaction: breakers → insert facts → projections → post-merge recheck."""
-        with self.conn.cursor() as cur:
-            try:
+        try:
+            with self.conn.transaction(), self.conn.cursor() as cur:
                 # B4 (H4): merge-redirect acyclicity is a HARD apply-time breaker
                 for kind, body in cr.staged:
                     if kind == "assert" and body["field"] == "migrated_to" and body["value"]:
@@ -122,16 +123,13 @@ class PgFactLog:
                     "UPDATE change_requests SET status=%s, flags=%s, "
                     "merged_seq=(SELECT MAX(seq) FROM facts) WHERE cr_id=%s",
                     (status, Jsonb(flags), cr.cr_id))
-                self.conn.commit()
-                return status, flags
-            except BreakerViolation:
-                self.conn.rollback()
-                with self.conn.cursor() as c2:
-                    c2.execute("UPDATE change_requests SET status='flagged', "
-                               "flags=%s WHERE cr_id=%s",
-                               (Jsonb(["B4: redirect cycle"]), cr.cr_id))
-                self.conn.commit()
-                raise
+            return status, flags
+        except BreakerViolation:
+            with self.conn.cursor() as c2:
+                c2.execute("UPDATE change_requests SET status='flagged', "
+                           "flags=%s WHERE cr_id=%s",
+                           (Jsonb(["B4: redirect cycle"]), cr.cr_id))
+            raise
 
     # -- convenience: single-fact system CRs (tests/seeding) ------------------
     def quick(self, build):
@@ -194,13 +192,12 @@ class PgFactLog:
 
     def rebuild_projections(self):
         """Replay the log — proves projections are pure indexes over it."""
-        with self.conn.cursor() as cur:
+        with self.conn.transaction(), self.conn.cursor() as cur:
             for t in ("citations", "current_fields", "edge_identities", "node_identities"):
                 cur.execute(f"TRUNCATE {t} CASCADE")
             cur.execute("SELECT seq, fact_id, kind, body FROM facts ORDER BY seq")
             for seq, fact_id, kind, body in cur.fetchall():
                 self._project(cur, seq, fact_id, kind, body)
-        self.conn.commit()
 
     # -- breakers -------------------------------------------------------------
     def _walk_redirect_guard(self, cur, src, dst):

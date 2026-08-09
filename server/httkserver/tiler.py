@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from httk import Store, View, realizable
 from httkdb.factlog import PgFactLog
-from httkserver.layout import layered_layout, importance
+from httkserver.layout import layered_layout, importance, version_map
 
 EXTENT = 4096
 BUF = 256                     # tile buffer: geometry clipped server-side (px)
@@ -120,7 +120,8 @@ def _state():
         store = Store.load(pg.export_jsonl())
         view = View(store)
         _cache.update(seq=seq, store=store, view=view,
-                      pos=layered_layout(view), imp=importance(view))
+                      pos=layered_layout(view), imp=importance(view),
+                      vmap=version_map(view))
     return _cache
 
 
@@ -170,6 +171,8 @@ def tile(z: int, x: int, y: int):
                 "cited": _cited(view, n),
                 "layer": layer,
                 "rank": round(st["imp"].get(n, 0.0), 3),   # hub..leaf (airport map)
+                "version": n in st["vmap"],                # satellite (collapsible)
+                "family": st["vmap"].get(n, (None,))[0] or "",
             },
         })
     for e in view._edges.values():
@@ -189,7 +192,10 @@ def tile(z: int, x: int, y: int):
                                "ghost": e["type"] in GHOST_TYPES,
                                "shadowed": view.is_shadowed(e["edge_id"]),
                                "rank": round(min(st["imp"].get(e["from"], 0),
-                                                 st["imp"].get(e["to"], 0)), 3)},
+                                                 st["imp"].get(e["to"], 0)), 3),
+                               "vfamily": (st["vmap"].get(e["from"], (None,))[0]
+                                           or st["vmap"].get(e["to"], (None,))[0]
+                                           or "")},
             })
     data = mapbox_vector_tile.encode([
         {"name": "edges", "features": edges_feats},
@@ -216,6 +222,9 @@ def node_card(node_id: str, k: int = 7):
         "image_url": view.field(node_id, "image_url"),
         "requires_count": len(ein), "requires": ein[:k],
         "enables_count": len(eout), "enables": eout[:k],
+        "versions": sorted(
+            [{"node_id": v, "year": y} for v, (f, y) in st["vmap"].items()
+             if f == node_id], key=lambda r: r["year"]),
         "position": st["pos"].get(node_id),
     }
 
