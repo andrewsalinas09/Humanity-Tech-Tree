@@ -147,8 +147,8 @@ def tile(z: int, x: int, y: int):
     nodes_feats, edges_feats = [], []
     for n, (lng, lat, layer) in pos.items():
         px, py = _lnglat_to_tilepx(lng, lat, z, x, y)
-        if not (-EXTENT <= px <= 2 * EXTENT and -EXTENT <= py <= 2 * EXTENT):
-            continue                                        # 1-tile buffer for labels
+        if not (0 <= px < EXTENT and 0 <= py < EXTENT):
+            continue          # points live in exactly ONE tile (no icon doubling)
         nd = view.node(n) or {}
         nodes_feats.append({
             "geometry": {"type": "Point", "coordinates": [px, py]},

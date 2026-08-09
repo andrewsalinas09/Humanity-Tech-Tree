@@ -93,7 +93,8 @@ export default function Home() {
   useEffect(() => {
     const map = new maplibregl.Map({
       container: mapDiv.current!, style: `${TILER}/style.json`,
-      center: [0, 20], zoom: 2.2, attributionControl: false,
+      center: [0, 10], zoom: 2.2, attributionControl: false,
+      renderWorldCopies: false,        // one world — no doubled planets
     });
     mapRef.current = map;
     map.on("load", () => {

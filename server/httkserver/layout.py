@@ -7,7 +7,7 @@ Positions are DERIVED data (ADR-0026) — rebuildable, never truth.
 """
 from httk.store import HARD_TYPES, TAXONOMY_TYPES
 
-LAT_MIN, LAT_MAX = -75.0, 75.0
+LAT_MIN, LAT_MAX = -60.0, 60.0
 LNG_MIN, LNG_MAX = -179.0, 179.0
 
 
@@ -46,7 +46,9 @@ def layered_layout(view):
             return (sum(ps) / len(ps)) if ps else 0.0
         ordered = sorted(layers[ly], key=lambda n: (bary(n), n))
         k = len(ordered)
-        span = min(340.0, 24.0 * max(k, 1))
+        # compact world: spread sized to content (zoom-out stays possible;
+        # the map grows as corridors multiply, never sprawls preemptively)
+        span = min(100.0, 9.0 * max(k, 1))
         for i, n in enumerate(ordered):
             lng = 0.0 if k == 1 else (-span / 2 + span * i / (k - 1))
             # User ruling: foundations at the TOP, derived tech descending —
