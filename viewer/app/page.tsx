@@ -1159,8 +1159,11 @@ export default function Home() {
                 <Chip ok label={edgeCard.type.toLowerCase().replace(/_/g, " ")} />{" "}
                 {edgeCard.qualifier && <Chip ok label={edgeCard.qualifier} />}{" "}
                 {edgeCard.year && <Chip ok label={`${Math.trunc(edgeCard.year)}`} />}{" "}
-                <Chip ok={!!edgeCard.citation}
-                      label={edgeCard.citation ? "cited" : "needs citation"} />
+                <Chip ok={!!edgeCard.citation
+                          || (edgeCard.claims ?? []).some((c: any) => c.citation)}
+                      label={edgeCard.citation
+                             || (edgeCard.claims ?? []).some((c: any) => c.citation)
+                             ? "cited" : "needs citation"} />
               </p>
               {edgeCard.justification &&
                 <p style={S.desc}>“{edgeCard.justification}”</p>}
@@ -1192,6 +1195,43 @@ export default function Home() {
               {edgeCard.epistemic &&
                 <div style={{ fontSize: 12, opacity: 0.65 }}>
                   epistemic: {edgeCard.epistemic}</div>}
+              {(edgeCard.claims ?? []).length > 0 && (
+                <div style={{ margin: "8px 0" }}>
+                  <div style={S.orTitle}>claims on this link (each needs its
+                    own source)</div>
+                  {edgeCard.claims.map((cl: any) => (
+                    <div key={cl.assertion}
+                         style={{ fontSize: 12.5, margin: "3px 0",
+                                  paddingLeft: 6,
+                                  borderLeft: cl.citation
+                                    ? "3px solid #2a9d8f"
+                                    : "3px solid #e63946" }}>
+                      <b>{cl.field.replace(/_/g, " ")}</b>: {cl.value}
+                      {cl.citation ? (
+                        <div style={{ opacity: 0.7, fontSize: 11.5 }}>
+                          📖 {cl.citation.source}
+                          {cl.citation.locator ? ` — ${cl.citation.locator}` : ""}
+                        </div>
+                      ) : (
+                        <button style={{ ...S.miniBtn, fontSize: 11,
+                                         padding: "0 8px", marginLeft: 6 }}
+                                onClick={async () => {
+                                  const src = window.prompt(
+                                    `Source for "${cl.field}" (doc-id / URL):`);
+                                  if (!src) return;
+                                  const loc = window.prompt(
+                                    "Locator (page/section — be precise):") ?? undefined;
+                                  const res = await api("/verb",
+                                    { name: "attach_citation",
+                                      params: { assertion_id: cl.assertion,
+                                                source_node: src, locator: loc } });
+                                  if (res.rejected)
+                                    alert(`${res.rejected.rule}: ${res.rejected.message}`);
+                                  else openEdge(edgeCard.edge_id);
+                                }}>📖 cite this claim</button>
+                      )}
+                    </div>))}
+                </div>)}
               {edgeCard.provenance &&
                 <div style={{ fontSize: 11.5, opacity: 0.5, margin: "6px 0" }}>
                   claimed by {edgeCard.provenance.by} · {edgeCard.provenance.at}

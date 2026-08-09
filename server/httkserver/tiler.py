@@ -394,6 +394,13 @@ def edge_card(edge_id: str):
         "shadowed_by": view.shadowed_by(edge_id),
         "citation": view.field(edge_id, "citation"),
         "effect": view.field(edge_id, "effect", []) or [],
+        # EVERY claim on the edge, individually citable (ADR-0038/0045 —
+        # user: "the purity is a citation"; each fact needs its own source)
+        "claims": [{"field": f, "assertion": aid,
+                    "value": str(v)[:80],
+                    "citation": view.field(aid, "citation")}
+                   for (subj, f), (aid, v) in view._fields.items()
+                   if subj == edge_id and f != "citation"],
         "provenance": ({"by": row[0], "at": row[1].date().isoformat()}
                        if row else None),
     }
