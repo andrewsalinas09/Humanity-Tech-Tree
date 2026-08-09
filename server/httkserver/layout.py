@@ -119,6 +119,10 @@ def _relax(pos, edges, imp, iters=260):
             f = 0.02 * (d - rest)
             F[u][0] += f * dx / d; F[u][1] += f * dy / d
             F[v][0] -= f * dx / d; F[v][1] -= f * dy / d
+            # TOP-DOWN FLOW (user ruling): dependency chains align into
+            # vertical columns — pull edge endpoints toward one longitude
+            ax = 0.028 * dx
+            F[u][0] += ax; F[v][0] -= ax
         for n in ids:                                    # altitude still means
             F[n][1] += 0.10 * (anchor[n] - P[n][1])
         step = 0.55 * (1 - it / iters) + 0.04

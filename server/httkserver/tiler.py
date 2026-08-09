@@ -299,10 +299,9 @@ def style():
              "layout": {"line-cap": "round", "line-join": "round"},
              "paint": {"line-color": ["case", ["get", "shadowed"], "#c3ccd8",
                                       "#8aa8cf"],
-                       "line-width": ["+",                     # trunk routes thicker
-                                      ["interpolate", ["linear"], ["zoom"],
-                                       2, 0.8, 8, 1.6],
-                                      ["*", 2.4, ["get", "rank"]]],
+                       "line-width": ["interpolate", ["linear"], ["zoom"],
+                                      2, ["+", 0.8, ["*", 1.8, ["get", "rank"]]],
+                                      8, ["+", 1.6, ["*", 2.6, ["get", "rank"]]]],
                        "line-opacity": [*DIM, 0.25,
                                         ["+", 0.45, ["*", 0.4, ["get", "rank"]]]],
                        "line-dasharray": ["case", ["get", "shadowed"],
