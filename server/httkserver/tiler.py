@@ -279,6 +279,7 @@ def _edge_view(view, e, other_key):
             "type": e["type"], "qualifier": e.get("qualifier") or "",
             "year": sd.get("year"),
             "justification": view.field(e["edge_id"], "justification"),
+            "constraints": view.field(e["edge_id"], "constraints", []) or [],
             "shadowed": view.is_shadowed(e["edge_id"])}
 
 

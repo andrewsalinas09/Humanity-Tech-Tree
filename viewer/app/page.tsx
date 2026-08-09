@@ -10,8 +10,10 @@ const TILER = process.env.NEXT_PUBLIC_TILER ?? "http://localhost:8748";
 type EdgeView = {
   edge_id: string; other: string; other_name: string; type: string;
   qualifier: string; year?: number; justification?: string;
+  constraints?: { attr: string; op: string; value: any; class: string }[];
   shadowed: boolean; alt_group?: number | null;
 };
+const OPS: Record<string, string> = { GT: ">", LT: "<", EQ: "=" };
 type Card = {
   name: string; category: string; description?: string;
   attributes?: Record<string, any>;
@@ -755,6 +757,15 @@ export default function Home() {
         {e.year ? ` · ${Math.trunc(e.year)}` : ""}
         {e.shadowed ? " · shadowed" : ""}
       </small>
+      {(e.constraints ?? []).map((c, i) => (
+        <span key={i} style={{ display: "inline-block", marginLeft: 6,
+                               padding: "0 6px", borderRadius: 8,
+                               background: c.class === "PHYSICAL" ? "#f3ecfa" : "#eef5f0",
+                               border: "1px solid #d8cfe8", fontSize: 11,
+                               color: "#5b4a7a" }}
+              title={`this link REQUESTS ${c.attr} ${OPS[c.op] ?? c.op} ${c.value} (${c.class})`}>
+          requests {c.attr} {OPS[c.op] ?? c.op} {c.value}
+        </span>))}
     </li>
   );
   const RequiresList = ({ items, total }:
