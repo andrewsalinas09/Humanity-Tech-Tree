@@ -9,7 +9,7 @@ from httk.store import HARD_TYPES, TAXONOMY_TYPES
 
 import math
 
-LAT_MIN, LAT_MAX = -60.0, 60.0
+LAT_MIN, LAT_MAX = -78.0, 78.0
 LNG_MIN, LNG_MAX = -179.0, 179.0
 
 
@@ -98,16 +98,16 @@ def _relax(pos, edges, imp, iters=260):
     ids = sorted(pos)
     P = {n: [pos[n][0], pos[n][1]] for n in ids}
     anchor = {n: pos[n][1] for n in ids}
-    w = {n: 0.35 + imp.get(n, 0.0) for n in ids}         # body mass 0.35..1.35
+    w = {n: 0.55 + 0.6 * imp.get(n, 0.0) for n in ids}   # softer hub differential
     for it in range(iters):
         F = {n: [0.0, 0.0] for n in ids}
-        for i, a in enumerate(ids):                      # repulsion: hubs push
+        for i, a in enumerate(ids):                      # repulsion: AIR (uncrammed)
             for b in ids[i + 1:]:
                 dx, dy = P[a][0] - P[b][0], P[a][1] - P[b][1]
                 d2 = dx * dx + dy * dy + 0.01
-                if d2 < 900:
+                if d2 < 4900:
                     d = d2 ** 0.5
-                    f = 120.0 * w[a] * w[b] / d2
+                    f = 1250.0 * w[a] * w[b] / d2
                     F[a][0] += f * dx / d; F[a][1] += f * dy / d
                     F[b][0] -= f * dx / d; F[b][1] -= f * dy / d
         for u, v in edges:                               # springs: leaves hug
@@ -115,7 +115,7 @@ def _relax(pos, edges, imp, iters=260):
                 continue
             dx, dy = P[v][0] - P[u][0], P[v][1] - P[u][1]
             d = (dx * dx + dy * dy) ** 0.5 + 1e-6
-            rest = 6.0 + 11.0 * (imp.get(u, 0) + imp.get(v, 0))
+            rest = 34.0 + 16.0 * (imp.get(u, 0) + imp.get(v, 0))
             f = 0.02 * (d - rest)
             F[u][0] += f * dx / d; F[u][1] += f * dy / d
             F[v][0] -= f * dx / d; F[v][1] -= f * dy / d
@@ -124,7 +124,7 @@ def _relax(pos, edges, imp, iters=260):
             ax = 0.028 * dx
             F[u][0] += ax; F[v][0] -= ax
         for n in ids:                                    # altitude still means
-            F[n][1] += 0.10 * (anchor[n] - P[n][1])
+            F[n][1] += 0.06 * (anchor[n] - P[n][1])
         step = 0.55 * (1 - it / iters) + 0.04
         for n in ids:
             P[n][0] = max(LNG_MIN, min(LNG_MAX, P[n][0] + step * F[n][0]))
