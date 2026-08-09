@@ -53,6 +53,7 @@ VERBS = {
     "retract_assertion": (VB.retract_assertion, False),
     "mark_shadowed": (VB.mark_shadowed, False),
     "add_alternative_bundle": (VB.add_alternative_bundle, False),
+    "extract_family": (VB.extract_family, False),
     "attach_citation": (VB.attach_citation, False),
     "correct": (VB.correct, False),
     "flag": (VB.flag, False),
@@ -76,6 +77,8 @@ def _merge_choice(verb, params, choice):
         p["second_leg_type"] = choice["second"]
     elif verb == "propose_node":
         p["duplicate_resolution"] = choice
+    elif verb == "extract_family":
+        p["hoist_choice"] = choice
     else:
         p["choice"] = choice
     return p
@@ -330,7 +333,7 @@ class Service:
         verb, params, status, options = row
         if status != "open":
             return {"rejected": {"rule": "TICKET", "message": f"ticket is {status}"}}
-        MARKERS = {"justification_required"}
+        MARKERS = {"justification_required", "exclude", "include"}
 
         def _matches(opt):
             if opt.get("key") != choice.get("key"):
@@ -763,6 +766,48 @@ class Service:
                         "opened_by": f["body"].get("opened_by"),
                         "status": resolved.get(f["fact_id"], "open")})
         return out
+
+    # -- structure linters (the graph files bounties on itself) ----------------
+    def run_sibling_linter(self, min_shared=5):
+        """Sibling clusters (user's Samsung-Galaxy case): nodes sharing ≥
+        min_shared providers with no common taxonomy parent get a WANT_NODE
+        request auto-posted by the 'linter' system identity — agents discover
+        structural debt through the same bounty queue as human asks."""
+        _, view = self._kernel()
+        from httk.store import HARD_TYPES, TAXONOMY_TYPES
+        claims, parents = {}, {}
+        for n in view.nodes():
+            if view.edges_out(n, {"IS_REFINEMENT_OF"}):
+                continue                     # versions cluster by design
+            claims[n] = {(e["from"], e["type"])
+                         for e in view.edges_in(n, HARD_TYPES)
+                         if not view.is_shadowed(e["edge_id"])}
+            parents[n] = {e["to"] for e in view.edges_out(n, TAXONOMY_TYPES)}
+        posted = []
+        nodes = sorted(claims)
+        for i, a in enumerate(nodes):
+            for b in nodes[i + 1:]:
+                shared = claims[a] & claims[b]
+                if len(shared) < min_shared or (parents[a] & parents[b]):
+                    continue
+                wanted = f"Taxonomy parent for {a} + {b}"
+                with self.pg.conn.cursor() as c:
+                    c.execute("SELECT 1 FROM requests WHERE wanted_name=%s "
+                              "AND status IN ('open','reopened')", (wanted,))
+                    if c.fetchone():
+                        continue
+                    c.execute(
+                        "INSERT INTO requests (want, wanted_name, "
+                        "wanted_description, notes, requested_by) "
+                        "VALUES ('WANT_NODE', %s, %s, %s, %s)",
+                        (wanted,
+                         f"A family node both {a} and {b} are types of; "
+                         "extract_family hoists the shared dependencies.",
+                         "auto-posted by the sibling-cluster linter; shared: "
+                         + ", ".join(sorted(f"{p} ({t})" for p, t in shared)),
+                         Jsonb({"type": "system", "id": "linter"})))
+                posted.append(wanted)
+        return {"posted": posted}
 
     # -- internals -------------------------------------------------------------
     def _apply(self, identity, facts, notes):

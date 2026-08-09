@@ -24,6 +24,7 @@ def svc():
     pg.migrate(os.path.join(MIG, "006_embeddings.sql"))
     pg.migrate(os.path.join(MIG, "007_reputation_numeric.sql"))
     pg.migrate(os.path.join(MIG, "008_max_reputation.sql"))
+    pg.migrate(os.path.join(MIG, "009_linter_user.sql"))
     pg.wipe()
     with pg.conn.cursor() as c:
         c.execute("TRUNCATE credentials, users, requests, request_endorsements, "
@@ -226,3 +227,44 @@ def test_reputation_and_challenge_loop(svc):
         # andrew: +3 for the upheld challenge (opened_by), minus agent rollup -1.5
         c.execute("SELECT reputation FROM users WHERE user_id='andrew'")
         assert float(c.fetchone()[0]) == 1.5
+
+
+def test_galaxy_scenario_extract_family(svc):
+    """The late-arriving taxonomy parent, end to end: siblings wired flat ->
+    linter files a bounty -> extract_family ticket (grouped hoist choice) ->
+    family edges + shadowed instance edges (history preserved)."""
+    def seed(cr):
+        for n in ("cpu2", "battery2", "wifi2", "glass2", "iphone2", "galaxy2"):
+            cr.create_node(n)
+    svc.pg.quick(seed)
+    def wire(cr):
+        for s in ("iphone2", "galaxy2"):
+            for p in ("cpu2", "battery2", "wifi2", "glass2"):
+                cr.create_edge(f"e_{p}_{s}", p, s, "IS_COMPONENT_OF")
+    svc.pg.quick(wire)
+    # the linter notices the sibling cluster and files a bounty
+    out = svc.run_sibling_linter(min_shared=4)
+    assert any("galaxy2 + iphone2" in w for w in out["posted"])
+    assert not svc.run_sibling_linter(min_shared=4)["posted"]   # deduped
+    # the heal: create the parent, extract the family
+    r = svc.search_similar("tok-andrew", "smartphone2")
+    svc.propose_node("tok-andrew", "Smartphone2", search_receipt=r["receipt"],
+                     node_id="smartphone2")
+    out = svc.execute("tok-andrew", "extract_family",
+                      {"parent": "smartphone2",
+                       "siblings": ["iphone2", "galaxy2"]})
+    assert "ticket" in out                       # refuses to guess the hoist
+    assert len(out["evidence"]["shared"]) == 4   # grouped evidence rides along
+    done = svc.resolve_decision("tok-andrew", out["ticket"],
+                                {"key": "hoist_except", "exclude": ["glass2"]},
+                                justification="glass differs per maker")
+    assert "applied" in done
+    _, view = svc._kernel()
+    # family edges exist; instance edges shadowed (except glass, which stays)
+    assert view.edge("e_cpu2_smartphone2")
+    assert view.is_shadowed("e_cpu2_iphone2") and view.is_shadowed("e_cpu2_galaxy2")
+    assert not view.is_shadowed("e_glass2_iphone2")
+    assert any(e["to"] == "smartphone2"
+               for e in view.edges_out("iphone2", {"IS_TYPE_OF"}))
+    # no re-fire: siblings now share a parent
+    assert not svc.run_sibling_linter(min_shared=4)["posted"]

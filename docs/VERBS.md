@@ -89,3 +89,6 @@ H5: compiles the forward-edit redirect reversal. Then computes the triage set: a
 ## The invariant this catalog enforces
 
 **Nothing a caller can express compiles to invalid structure.** Direction lives in verb names; legality lives in computed checks; genuine judgment lives in Decisions whose option sets are machine-complete. A malicious or ignorant caller's worst case is wrong-but-legal *content* — which is exactly what the moderation, verification, and bounty machinery exists to catch.
+
+### `extract_family(parent, siblings, hoist_choice?, justification?)`
+The late-arriving taxonomy parent (ADR-0050, TB-071). Parent must exist; ≥2 siblings. Computes claims shared by ALL siblings → Decision ticket with grouped bulk options (`hoist_all` / `hoist_except{exclude:[...]}` / `hoist_only{include:[...]}` / `hoist_none`); resolution compiles to IS_TYPE_OF classifies + family edges on the parent (ADR-0019 inheritable defaults) + `shadowed_by` on covered instance edges. Non-hoisted claims stay at instances. The pick + justification are recorded forever.

@@ -4,7 +4,7 @@ the complete legal option set; callers only choose.
 """
 from dataclasses import dataclass, field
 
-from .store import Store, View
+from .store import Store, View, HARD_TYPES, TAXONOMY_TYPES
 
 PEOPLE_ORGS = {"BIOLOGICAL_ENTITY", "ORGANIZATION"}
 KNOWLEDGE = {"NATURAL_LAW", "FORMAL_CONCEPT", "METHOD_TECHNIQUE", "WORK_PUBLICATION"}
@@ -502,6 +502,85 @@ def mark_shadowed(view, edge_id, covering, confirmation=""):
     return StagedFacts([("assert", {"subject": edge_id, "field": "shadowed_by",
                                     "value": list(covering)})],
                        [f"coverage human-confirmed (L8): {confirmation}"])
+
+
+def extract_family(view, parent, siblings, hoist_choice=None, justification=None):
+    """The late-arriving taxonomy parent (user's Samsung-Galaxy case,
+    2026-08-09): siblings that share many providers get a family node, and
+    shared dependencies HOIST to it — family edges inherit down (ADR-0019),
+    covered instance edges are shadowed (history, never deleted). Which
+    shared claims hoist is a Decision presented GROUPED for one-glance bulk
+    selection (user ruling); the pick is recorded forever in the resolution.
+    Compiles entirely to existing mechanics: classify + edges + shadowed_by."""
+    sibs = sorted(set(siblings or []))
+    if len(sibs) < 2:
+        return Rejection("ADR-0019", "extract_family needs ≥2 siblings")
+    if view.node(parent) is None:
+        return Rejection("E404", f"parent '{parent}' must exist "
+                                 "(propose_node it first)")
+    for s in sibs:
+        if view.node(s) is None:
+            return Rejection("E404", f"sibling {s} unknown")
+
+    shared = None
+    for s in sibs:
+        claims = {(e["from"], e["type"]) for e in view.edges_in(s, HARD_TYPES)
+                  if not view.is_shadowed(e["edge_id"])}
+        shared = claims if shared is None else shared & claims
+    shared = sorted(shared or [])
+
+    if hoist_choice is None and shared:
+        by_cat = {}
+        for p, t in shared:
+            by_cat.setdefault(_cat(view, p) or "?", []).append(f"{p} ({t})")
+        grouped = "; ".join(f"{c}: {', '.join(items)}"
+                            for c, items in sorted(by_cat.items()))
+        return Decision(
+            "extract_family",
+            f"hoist which shared dependencies to '{parent}'? — {grouped}",
+            [{"key": "hoist_all"},
+             {"key": "hoist_except", "exclude": []},
+             {"key": "hoist_only", "include": []},
+             {"key": "hoist_none"}],
+            evidence={"shared": [{"provider": p, "type": t,
+                                  "category": _cat(view, p)}
+                                 for p, t in shared]})
+
+    key = (hoist_choice or {}).get("key", "hoist_all")
+    if key == "hoist_all":
+        chosen = shared
+    elif key == "hoist_except":
+        drop = set(hoist_choice.get("exclude") or [])
+        chosen = [c for c in shared if c[0] not in drop]
+    elif key == "hoist_only":
+        keep = set(hoist_choice.get("include") or [])
+        chosen = [c for c in shared if c[0] in keep]
+    else:
+        chosen = []
+
+    facts, notes = [], []
+    for s in sibs:
+        if not any(e["to"] == parent for e in view.edges_out(s, TAXONOMY_TYPES)):
+            facts.append(("edge.create", {"edge_id": f"t_{s}_{parent}",
+                                          "from": s, "to": parent,
+                                          "type": "IS_TYPE_OF",
+                                          "qualifier": None}))
+    for p, t in chosen:
+        fam_eid = f"e_{p}_{parent}"
+        if not _claim_exists(view, p, parent, t):
+            facts.append(("edge.create", {"edge_id": fam_eid, "from": p,
+                                          "to": parent, "type": t,
+                                          "qualifier": None}))
+        for s in sibs:
+            for e in view.edges_in(s, {t}):
+                if e["from"] == p and not view.is_shadowed(e["edge_id"]):
+                    facts.append(("assert", {"subject": e["edge_id"],
+                                             "field": "shadowed_by",
+                                             "value": [fam_eid]}))
+    notes.append(f"family '{parent}' extracted from {len(sibs)} siblings; "
+                 f"hoisted {len(chosen)}/{len(shared)} shared claims"
+                 + (f" — {justification}" if justification else ""))
+    return StagedFacts(facts, notes)
 
 
 def add_alternative_bundle(view, consumer, alternative_to, parts):
