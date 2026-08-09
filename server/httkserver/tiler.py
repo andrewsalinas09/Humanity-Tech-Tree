@@ -312,6 +312,16 @@ def node_card(node_id: str, k: int = 9):
                               "source_name": (view.field(c.get("source"), "name")
                                               or c.get("source")),
                               "locator": c.get("locator")})
+    # edge-level citations (ADR-0045 §5): evidence for the dependency itself
+    for e in view.edges_in(node_id) + view.edges_out(node_id):
+        c = view.field(e["edge_id"], "citation")
+        if c:
+            other = e["from"] if e["to"] == node_id else e["to"]
+            cites.append({"claim": f"link ↔ {view.field(other, 'name') or other}",
+                          "source": c.get("source"),
+                          "source_name": (view.field(c.get("source"), "name")
+                                          or c.get("source")),
+                          "locator": c.get("locator")})
 
     return {
         "node": n,

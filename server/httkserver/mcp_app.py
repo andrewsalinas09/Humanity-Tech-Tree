@@ -57,7 +57,12 @@ def build_app(pinned=None):
 
     @app.tool()
     def search_similar(query: str, ctx: Context) -> dict:
-        """Existence gate (mandatory before propose_node): find matching nodes, get a receipt."""
+        """Existence gate (mandatory before propose_node): find matching nodes,
+        get a receipt. Receipts are reusable but query-bound — search for the
+        NAME you intend to propose, right before proposing it (a receipt for a
+        different query proves nothing about your name's duplicates).
+        Currently name/alias substring matching: also walk get_node edge
+        lists of neighbors before concluding something doesn't exist."""
         tok = _cred(ctx, pinned)
         return svc.search_similar(tok, query) if tok else _NO_CRED
 
@@ -67,7 +72,12 @@ def build_app(pinned=None):
                      node_id: str = None, description: str = None) -> dict:
         """Create a node (requires a search_similar receipt; near-dupes open a
         ticket). Include a 2-3 sentence description — what it is and why it
-        matters; it powers learning AND future semantic search."""
+        matters; it powers learning AND future semantic search.
+        Valid categories: TECHNOLOGY, MATERIAL, METHOD_TECHNIQUE, NATURAL_LAW,
+        NATURAL_PHENOMENON, FORMAL_CONCEPT, CAPABILITY, STANDARD_UNIT,
+        WORK_PUBLICATION, LEGISLATION, HISTORICAL_EVENT, SOCIETAL_ERA,
+        SOCIETAL_NEED, BELIEF_SYSTEM, BIOLOGICAL_ENTITY, ORGANIZATION,
+        GEOPOLITICAL_ENTITY, BRAND."""
         tok = _cred(ctx, pinned)
         return svc.propose_node(tok, name, category, validity, search_receipt,
                                 None, node_id, description) if tok else _NO_CRED

@@ -387,10 +387,14 @@ export default function Home() {
                             s.locator ? `${s.source} — ${s.locator}` : s.source)
                           .join(" · ")}</div>}
                   <div style={{ marginTop: 4 }}>
-                    {r.status === "open" ? (
-                      <button onClick={() => endorse(r.request)} style={S.miniBtn}>
-                        ▲ {r.endorsements}
-                      </button>
+                    {r.status !== "fulfilled" ? (
+                      <>
+                        {r.status === "reopened" &&
+                          <Chip ok={false} label="re-opened" />}{" "}
+                        <button onClick={() => endorse(r.request)} style={S.miniBtn}>
+                          ▲ {r.endorsements}
+                        </button>
+                      </>
                     ) : (
                       <>
                         <Chip ok label={`fulfilled by ${r.fulfilled_by?.id}`} />{" "}

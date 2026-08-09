@@ -396,8 +396,10 @@ class Service:
                 "r.requested_by, r.fulfilled_by, r.fulfilled_links, "
                 "(SELECT count(*) FROM request_endorsements e "
                 " WHERE e.request_id = r.request_id) AS endorsements "
-                "FROM requests r WHERE (%s = 'all' OR r.status = %s) "
-                "ORDER BY endorsements DESC, r.request_id", (status, status))
+                "FROM requests r WHERE (%s = 'all' OR r.status = %s "
+                "  OR (%s = 'open' AND r.status = 'reopened')) "
+                "ORDER BY endorsements DESC, r.request_id",
+                (status, status, status))
             cols = ("request", "want", "subject_node", "wanted_name",
                     "wanted_description", "notes", "offered_sources", "status",
                     "requested_by", "fulfilled_by", "fulfilled_links",
@@ -434,7 +436,7 @@ class Service:
             if not row:
                 return {"rejected": {"rule": "E404",
                                      "message": f"request {request_id}?"}}
-            if row[0] != "open":
+            if row[0] not in ("open", "reopened"):
                 return {"rejected": {"rule": "REQ", "message": "already fulfilled"}}
             requested_by = row[1]
             c.execute("SELECT count(*) FROM request_endorsements "
@@ -454,7 +456,7 @@ class Service:
     def reopen_request(self, token, request_id, reason):
         identity, _ = self.authenticate(token)
         with self.pg.conn.cursor() as c:
-            c.execute("UPDATE requests SET status='open', "
+            c.execute("UPDATE requests SET status='reopened', "
                       "notes = COALESCE(notes,'') || %s WHERE request_id=%s "
                       "AND status='fulfilled' RETURNING request_id",
                       (f"\n[re-opened by {identity.get('id')}: {reason}]",
@@ -556,9 +558,17 @@ class Service:
         cr = self.pg.open_cr(proposer=identity)
         for kind, body in facts:
             cr.add(kind, body)
-        status, flags = self.pg.apply(cr)
+        status, flags, created = self.pg.apply(cr)
+        # echo what was made (agent friction #2): node/edge ids and — crucially
+        # — assertion ids, which attach_citation needs and nothing returned
+        echo = {"nodes": [c["id"] for c in created if c["kind"] == "node.create"],
+                "edges": [c["id"] for c in created if c["kind"] == "edge.create"],
+                "assertions": [{"assertion_id": c["fact_id"],
+                                "subject": c["subject"], "field": c["field"]}
+                               for c in created if c["kind"] == "assert"]}
         return {"applied": {"cr": cr.cr_id, "status": status, "flags": flags,
-                            "facts_written": len(facts), "notes": notes}}
+                            "facts_written": len(facts), "notes": notes,
+                            "created": echo}}
 
     def _open_ticket(self, identity, verb, params, reason, options, evidence=None):
         with self.pg.conn.cursor() as c:

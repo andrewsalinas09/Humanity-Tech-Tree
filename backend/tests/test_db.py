@@ -49,7 +49,7 @@ def _author_gate_world(cr):
 
 
 def test_db_export_solves_identically_to_kernel(pg):
-    status, flags = pg.quick(_author_gate_world)
+    status, flags, _ = pg.quick(_author_gate_world)
     assert status == "merged" and not flags
     r = db_solve(pg, "gate")
     assert r.existence is Tri.SAT and r.fitness is Tri.SAT    # transistor branch wins
@@ -91,9 +91,9 @@ def test_b4_redirect_cycle_hard_rejects(pg):
 
 def test_h9_jointly_cyclic_crs_merge_but_flag(pg):
     pg.quick(lambda cr: (cr.create_node("a"), cr.create_node("b")))
-    s1, f1 = pg.quick(lambda cr: cr.create_edge("x", "a", "b", "IS_COMPONENT_OF"))
+    s1, f1, _ = pg.quick(lambda cr: cr.create_edge("x", "a", "b", "IS_COMPONENT_OF"))
     assert s1 == "merged" and not f1                           # individually innocent
-    s2, f2 = pg.quick(lambda cr: cr.create_edge("y", "b", "a", "IS_COMPONENT_OF"))
+    s2, f2, _ = pg.quick(lambda cr: cr.create_edge("y", "b", "a", "IS_COMPONENT_OF"))
     assert s2 == "flagged" and any("cycle" in f for f in f2)   # flags, never reorders (H9)
 
 

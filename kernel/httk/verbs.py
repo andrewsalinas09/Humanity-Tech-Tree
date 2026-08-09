@@ -338,7 +338,14 @@ def unmerge(store, view, node, justification=""):
 def attach_citation(view, assertion_id, source_node, locator=None, subject=None):
     """Citation fact + the ALWAYS-CONNECTED rule (user): a source is never an
     island — citing also lays an ASSOCIATION(documents) ghost edge from the
-    source to the claim's subject node. The edge TYPE carries the meaning."""
+    source to the claim's subject node (when the source IS a node; plain
+    doc-id strings are the ADR-0045 default). The target may be an ASSERTION
+    id or an EDGE id — citing an edge evidences the dependency claim itself
+    (user ruling 2026-08-09: recorded intent makes future merges and
+    reassignments never have to guess why a link exists)."""
+    e = view.edge(assertion_id)
+    if e is not None and subject is None:
+        subject = e["to"]                    # the consumer whose claim it is
     facts = [("assert", {"subject": assertion_id, "field": "citation",
                          "value": {"source": source_node, "locator": locator}})]
     if subject and view.node(subject) and view.node(source_node):

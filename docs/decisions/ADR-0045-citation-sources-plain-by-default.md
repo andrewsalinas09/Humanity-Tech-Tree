@@ -12,6 +12,7 @@ ADR-0038 made citations target assertions and reference a source node; the alway
 2. **A work becomes a node only when it earns story membership** — the Significance Filter (ADR-0009) applied to works: someone notable authored it (authored-by thread), it enabled/suppressed/unlocked something (the docket pattern), or readers need to navigate to it. Existing story nodes (fcc-81-413, us2292387, usgs-mcs) keep their status.
 3. **When a node exists for the source, the citation links it** and the always-connected rule applies (ADR-0038's `documents` thread) — node-existence is an upgrade, never a requirement. The kernel verb already tolerates both (edge laid only `if view.node(source_node)`).
 4. **Citations must target the claim being evidenced.** Citing `name` is (almost always) vacuous; the right targets are origin dates, edges/justifications, constraints, validity. Linter L14: a citation whose target assertion is `name` or `aliases` is flagged for review.
+5. **Edge-level citations are legal and first-class** (user ruling, same day — after the first autonomous agent did it spontaneously): `attach_citation` accepts an EDGE id, evidencing the dependency claim itself. Rationale (user): a cited + justified edge carries its INTENT on its face — future merges, intercepts, and reassignments never have to guess why the link exists. The kernel resolves the always-connected subject to the edge's consumer.
 
 ## Consequences
 - Bibliography scales without map clutter; the map stays a map of *things and story*, not references.

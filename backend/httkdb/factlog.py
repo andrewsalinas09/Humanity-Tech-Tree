@@ -98,7 +98,11 @@ class PgFactLog:
         return ChangeRequest(cr_id, proposer)
 
     def apply(self, cr):
-        """One transaction: breakers → insert facts → projections → post-merge recheck."""
+        """One transaction: breakers → insert facts → projections → post-merge
+        recheck. Returns (status, flags, created) — created echoes every fact
+        id written, so callers never have to re-fetch to learn what they made
+        (agent friction finding, 2026-08-09)."""
+        created = []
         try:
             with self.conn.transaction(), self.conn.cursor() as cur:
                 # B4 (H4): merge-redirect acyclicity is a HARD apply-time breaker
@@ -115,6 +119,10 @@ class PgFactLog:
                     fact_id = f"f_{seq:05d}"
                     cur.execute("UPDATE facts SET fact_id=%s WHERE seq=%s", (fact_id, seq))
                     self._project(cur, seq, fact_id, kind, body)
+                    created.append({"fact_id": fact_id, "kind": kind,
+                                    "id": body.get("node_id") or body.get("edge_id"),
+                                    "subject": body.get("subject"),
+                                    "field": body.get("field")})
 
                 # H9: post-merge structural recheck — flags, never reorders
                 flags = self._hard_cycles(cur)
@@ -123,7 +131,7 @@ class PgFactLog:
                     "UPDATE change_requests SET status=%s, flags=%s, "
                     "merged_seq=(SELECT MAX(seq) FROM facts) WHERE cr_id=%s",
                     (status, Jsonb(flags), cr.cr_id))
-            return status, flags
+            return status, flags, created
         except BreakerViolation:
             with self.conn.cursor() as c2:
                 c2.execute("UPDATE change_requests SET status='flagged', "
