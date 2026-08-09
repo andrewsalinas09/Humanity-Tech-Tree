@@ -56,3 +56,9 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Confidence score** — the continuous 0–100 evidence dimension per claim: a versioned open formula over source count/independence/reliability, verification events, and challenges; computed never stored; displayed as bands with number+trace on hover (ADR-0033). A low score on a popular claim is a decomposition bounty.
 - **Validity status** — whether a claim is currently held true: current truth, disproven, superseded, hypothetical, subjective. Orthogonal to epistemic status.
 - **Vouch** — endorsement of a shadow-branch edit; three vouches merge it; vouching for vandalism costs reputation.
+
+**Decision ticket** — a blocked operation: a verb refused to guess mid-edit and parked the complete legal option set (ADR-0040/0041). Resolving one finishes a specific edit; the choice + chooser are recorded.
+
+**Bounty / request** — open work nobody started: WANT_NODE, WANT_COVERAGE, WANT_EVIDENCE, WANT_DESCRIPTION (ADR-0051). Anyone fulfills; fulfilling earns ink; endorsements (agents allowed, forever) sort the queue. System linters auto-post these for structural gaps — the graph files bounties on itself.
+
+**Challenge** — a dispute about recorded truth (ADR-0049): grounds + optional pre-staged remedy verbs; reasoned, reputation-weighted votes advise (human-only at maturity, HTT_HUMAN_VOTES_ONLY); an admin ratifies; upheld remedies execute with the challenge as provenance.

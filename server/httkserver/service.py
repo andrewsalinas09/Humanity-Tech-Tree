@@ -439,9 +439,10 @@ class Service:
                                  "message": "WANT_NODE needs wanted_name"}}
         if want != "WANT_NODE":
             _, view = self._kernel()
-            if not subject_node or not view.node(subject_node):
+            if not subject_node or not (view.node(subject_node)
+                                        or view.edge(subject_node)):
                 return {"rejected": {"rule": "REQ", "message":
-                        f"{want} needs an existing subject_node"}}
+                        f"{want} needs an existing subject (node or edge)"}}
         with self.pg.conn.cursor() as c:
             c.execute(
                 "INSERT INTO requests (want, subject_node, wanted_name, "
@@ -514,8 +515,9 @@ class Service:
             pts = 3 + endorsements
             c.execute("UPDATE users SET ink = ink + %s WHERE user_id = %s",
                       (pts, identity.get("id")))
-            c.execute("UPDATE users SET ink = ink + 1 WHERE user_id = %s",
-                      (requested_by.get("id"),))
+            # poster ink — but the graph doesn't tip itself (system posters)
+            c.execute("UPDATE users SET ink = ink + 1 WHERE user_id = %s "
+                      "AND kind <> 'system'", (requested_by.get("id"),))
         return {"fulfilled": request_id, "points_earned": pts}
 
     def reopen_request(self, token, request_id, reason):
@@ -705,6 +707,14 @@ class Service:
     def vote_challenge(self, token, challenge_id, support, reason):
         identity, budget = self.authenticate(token)
         self._check_budget(identity, budget)
+        # ADR-0051: content-truth voting goes HUMAN-ONLY at maturity (agents
+        # keep bounty-endorsement voting forever). Testing phase: flag off.
+        import os as _os
+        if (_os.environ.get("HTT_HUMAN_VOTES_ONLY")
+                and identity.get("type") != "human"):
+            return {"rejected": {"rule": "ADR-0051",
+                                 "message": "challenge voting is human-only "
+                                            "(agents may endorse bounties)"}}
         if not reason:
             return {"rejected": {"rule": "ADR-0049",
                                  "message": "votes carry reasons"}}
@@ -844,6 +854,52 @@ class Service:
                          Jsonb({"type": "system", "id": "linter"})))
                 posted.append(wanted)
         return {"posted": posted}
+
+    def run_texture_linter(self, max_posts=8):
+        """The gap economy (ADR-0051): missing texture auto-becomes bounties —
+        undescribed nodes and unjustified hard edges get WANT_DESCRIPTION
+        requests from the `linter` identity. Fulfilling them earns ink; the
+        not-yet-done becomes a structured, sortable queue. Drip-capped per run
+        so the human queue never floods."""
+        _, view = self._kernel()
+        from httk.store import HARD_TYPES
+        gaps = []
+        for n in sorted(view.nodes()):
+            if not view.field(n, "description"):
+                gaps.append((n, f"Description for {n}",
+                             "This node has no description — write 2-3 "
+                             "sentences: what it is and why it matters. "
+                             "Descriptions power learning AND semantic search."))
+        for n in sorted(view.nodes()):
+            for e in view.edges_in(n, HARD_TYPES):
+                eid = e["edge_id"]
+                if (not view.is_shadowed(eid)
+                        and not view.field(eid, "justification")):
+                    gaps.append((eid, f"Justification for {eid}",
+                                 f"Why does {e['to']} depend on {e['from']}? "
+                                 "A justified edge carries its intent — future "
+                                 "merges never have to guess."))
+        posted = []
+        with self.pg.conn.cursor() as c:
+            for subject, wanted, notes in gaps:
+                if len(posted) >= max_posts:
+                    break
+                c.execute("SELECT 1 FROM requests WHERE want='WANT_DESCRIPTION' "
+                          "AND subject_node=%s AND status IN ('open','reopened')",
+                          (subject,))
+                if c.fetchone():
+                    continue
+                c.execute("SELECT 1 FROM requests WHERE want='WANT_DESCRIPTION' "
+                          "AND subject_node=%s AND status='fulfilled'", (subject,))
+                if c.fetchone():
+                    continue                    # was worked; gap must be re-raised
+                c.execute(
+                    "INSERT INTO requests (want, subject_node, wanted_name, "
+                    "notes, requested_by) VALUES ('WANT_DESCRIPTION',%s,%s,%s,%s)",
+                    (subject, wanted, "auto-posted by the texture linter. " + notes,
+                     Jsonb({"type": "system", "id": "linter"})))
+                posted.append(subject)
+        return {"posted": posted, "gaps_total": len(gaps)}
 
     # -- internals -------------------------------------------------------------
     def _apply(self, identity, facts, notes):

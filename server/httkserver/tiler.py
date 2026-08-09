@@ -125,10 +125,11 @@ def _state():
                 zmin[n] = 0 if r >= 0.95 else 2 if r >= 0.6 else 3
         _cache.update(seq=seq, store=store, view=view, pos=pos, paths=paths,
                       imp=imp, vmap=vmap, zmin=zmin)
-        try:      # the graph files bounties on itself as it grows (ADR-0050)
+        try:      # the graph files bounties on itself as it grows (ADR-0050/51)
             _get_svc().run_sibling_linter()
+            _get_svc().run_texture_linter()
         except Exception as e:
-            print(f"sibling linter skipped: {e}")
+            print(f"linters skipped: {e}")
     return _cache
 
 
