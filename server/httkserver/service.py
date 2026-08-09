@@ -207,6 +207,15 @@ class Service:
         self._check_budget(identity, budget)
         if verb not in VERBS:
             return {"rejected": {"rule": "E404", "message": f"unknown verb {verb}"}}
+        if verb == "attach_citation" and "subject" not in params:
+            # always-connected rule: resolve the claim's subject so the verb can
+            # lay the source's ASSOCIATION(documents) edge
+            with self.pg.conn.cursor() as c:
+                c.execute("SELECT body FROM facts WHERE fact_id=%s AND kind='assert'",
+                          (params.get("assertion_id"),))
+                row = c.fetchone()
+            if row:
+                params = {**params, "subject": row[0].get("subject")}
         fn, needs_store = VERBS[verb]
         store, view = self._kernel()
         result = fn(store, view, **params) if needs_store else fn(view, **params)

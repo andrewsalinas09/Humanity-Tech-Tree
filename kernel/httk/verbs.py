@@ -75,7 +75,19 @@ def _edge_extras(edge_id, start=None, end=None, epistemic=None, justification=No
     return facts
 
 
+def _claim_exists(view, frm, to, etype):
+    """User ruling: adding a link that already exists must SAY SO."""
+    for e in view.edges_in(to, {etype}):
+        if e["from"] == frm and not view.is_shadowed(e["edge_id"]):
+            return e["edge_id"]
+    return None
+
+
 def _add_or_alternative(view, consumer, new_edge, role, extras=None):
+    dup = _claim_exists(view, new_edge["from"], new_edge["to"], new_edge["type"])
+    if dup:
+        return Rejection("EXISTS", f"this link already exists as edge '{dup}' — "
+                                   "nothing to add (cite or refine it instead)")
     """The L11 trigger: same-type edge into consumer whose provider shares a
     taxonomy ancestor with the new provider ⇒ role REQUIRED."""
     siblings = [e for e in view.edges_in(consumer, {new_edge["type"]})
@@ -141,6 +153,9 @@ def add_enabler(view, enabled, enabler, justification=None, edge_id=None,
             return Rejection("L3", "direct person link: justification required "
                                    "(substitutability default is 99.9% no)")
         notes.append("L3: direct person link — review-flagged")
+    dup = _claim_exists(view, enabler, enabled, "ENABLES")
+    if dup:
+        return Rejection("EXISTS", f"this link already exists as edge '{dup}'")
     eid = edge_id or f"e_{enabler}_{enabled}"
     e = {"edge_id": eid, "from": enabler, "to": enabled, "type": "ENABLES",
          "qualifier": None}
@@ -320,10 +335,18 @@ def unmerge(store, view, node, justification=""):
 
 # ----------------------------------------------------------- evidence verbs --
 
-def attach_citation(view, assertion_id, source_node, locator=None):
-    return StagedFacts([("assert", {"subject": assertion_id, "field": "citation",
-                                    "value": {"source": source_node,
-                                              "locator": locator}})])
+def attach_citation(view, assertion_id, source_node, locator=None, subject=None):
+    """Citation fact + the ALWAYS-CONNECTED rule (user): a source is never an
+    island — citing also lays an ASSOCIATION(documents) ghost edge from the
+    source to the claim's subject node. The edge TYPE carries the meaning."""
+    facts = [("assert", {"subject": assertion_id, "field": "citation",
+                         "value": {"source": source_node, "locator": locator}})]
+    if subject and view.node(subject) and view.node(source_node):
+        if not _claim_exists(view, source_node, subject, "ASSOCIATION"):
+            facts.append(("edge.create", {
+                "edge_id": f"a_{source_node}_{subject}", "from": source_node,
+                "to": subject, "type": "ASSOCIATION", "qualifier": "documents"}))
+    return StagedFacts(facts)
 
 
 def correct(view, subject, fld, new_value, justification=""):

@@ -11,6 +11,7 @@ The PMTiles bulk pyramid bakes this same contract ahead-of-time at scale.
 import math
 import os
 import sys
+import zlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "kernel"))
@@ -32,13 +33,17 @@ HARD = {"ENABLES", "IS_COMPONENT_OF", "IS_INGREDIENT_OF", "IS_TYPE_OF",
         "IS_REFINEMENT_OF"}
 
 
-def _bezier(a, b, n=14):
-    """Organic arc between world points: quadratic bezier bowed perpendicular."""
+def _bezier(a, b, n=14, seed=""):
+    """Organic arc between world points: quadratic bezier bowed perpendicular.
+    Bow SIGN and magnitude jitter deterministically per edge (seed) so near-
+    parallel wires separate instead of braiding into a rat's nest."""
     (x0, y0), (x1, y1) = a, b
     mx, my = (x0 + x1) / 2, (y0 + y1) / 2
     dx, dy = x1 - x0, y1 - y0
     dist = (dx * dx + dy * dy) ** 0.5 or 1.0
-    bow = min(6.0, dist * 0.12)                 # degrees of sideways bow
+    h = zlib.crc32(seed.encode()) & 0xffff   # stable across processes
+    sign = 1.0 if (h & 1) else -1.0
+    bow = sign * min(7.0, dist * 0.12) * (0.55 + 0.9 * ((h >> 1) % 1000) / 1000)
     cx, cy = mx - dy / dist * bow, my + dx / dist * bow
     pts = []
     for i in range(n + 1):
@@ -173,7 +178,7 @@ def tile(z: int, x: int, y: int):
             continue
         # organic arc in world space (consistent across tiles), then per-tile
         # convert + Liang-Barsky clip to buffer — no breaks at any zoom
-        arc = _bezier((a[0], a[1]), (b[0], b[1]))
+        arc = _bezier((a[0], a[1]), (b[0], b[1]), seed=e["edge_id"])
         px = [_lnglat_to_tilepx(lng, lat, z, x, y) for lng, lat in arc]
         for run in _clip_polyline(px, -BUF, EXTENT + BUF):
             edges_feats.append({
@@ -294,6 +299,12 @@ def style():
         "layers": [
             {"id": "bg", "type": "background",
              "paint": {"background-color": "#ffffff"}},
+            {"id": "edges-ghost", "type": "line", "source": "httk",
+             "source-layer": "edges", "filter": ["get", "ghost"],
+             "layout": {"line-cap": "round"},
+             "paint": {"line-color": "#b8aecb", "line-width": 1.0,
+                       "line-opacity": [*DIM, 0.1, 0.45],
+                       "line-dasharray": ["literal", [1, 3]]}},
             {"id": "edges", "type": "line", "source": "httk", "source-layer": "edges",
              "filter": ["!", ["get", "ghost"]],
              "layout": {"line-cap": "round", "line-join": "round"},
