@@ -793,6 +793,10 @@ class Service:
                                  "message": "challenges are ratified by admins"}}
         if outcome not in ("upheld", "rejected"):
             return {"rejected": {"rule": "ADR-0049", "message": "bad outcome"}}
+        if not note:
+            return {"rejected": {"rule": "ADR-0049",
+                                 "message": "ratification carries a reason — "
+                                            "admins aren't exempt (user ruling)"}}
         ch = next((f for f in self._all_facts()
                    if f["fact_id"] == challenge_id
                    and f["kind"] == "challenge.open"), None)

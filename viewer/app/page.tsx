@@ -409,7 +409,10 @@ export default function Home() {
   };
 
   const resolveCh = async (cid: string, outcome: string) => {
-    const res = await api(`/challenges/${cid}/resolve`, { outcome });
+    const note = window.prompt(
+      `Reason for ${outcome} (recorded forever — admins aren't exempt):`);
+    if (!note) return;
+    const res = await api(`/challenges/${cid}/resolve`, { outcome, note });
     if (res.rejected) alert(`${res.rejected.rule}: ${res.rejected.message}`);
     loadTickets();
   };
