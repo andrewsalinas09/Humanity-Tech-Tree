@@ -300,7 +300,8 @@ class Service:
             return self._open_ticket(
                 identity, "propose_node",
                 {"name": name, "category": category, "validity": validity,
-                 "search_receipt": search_receipt, "node_id": node_id},
+                 "search_receipt": search_receipt, "node_id": node_id,
+                 "description": description},
                 "near-duplicates found: use existing or create anyway (TB-032: "
                 "err toward creating; duplicates heal by merge)",
                 [{"key": "use_existing", "node_id": m["node_id"]} for m in exact]
@@ -424,7 +425,8 @@ class Service:
             else:
                 out = {"denied": ticket_id}
         elif verb == "propose_node":
-            out = self.propose_node(token, **merged)
+            merged.pop("justification", None)   # lives on the ticket record,
+            out = self.propose_node(token, **merged)  # not in the node params
         else:
             out = self.execute(token, verb, merged)
         with self.pg.conn.cursor() as c:
