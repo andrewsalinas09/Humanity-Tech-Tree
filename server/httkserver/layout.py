@@ -148,10 +148,26 @@ def compute_layout(view):
     for n in nodes:
         lines.append(f"  {_dot_quote(n)};")
     edge_ids, reversed_ids = [], set()
-    for n in nodes:
+    for n in sorted(view.nodes()):     # ALL consumers — version satellites'
+        # incoming edges must still contribute ranking ghosts (OFDM→802.11g)
         for e in sorted(view.edges_in(n, None), key=lambda e: e["edge_id"]):
             a, b = e["from"], e["to"]
-            if a in vmap or b in vmap or a not in depth or not view.node(a):
+            if not view.node(a):
+                continue
+            if a in vmap or b in vmap:
+                # version-touching edges: RANK against the family root so
+                # providers like OFDM/MIMO sit above their 802.11 home
+                # instead of drifting off as disconnected islands (user
+                # 2026-08-09). Synthetic id — never harvested as a path
+                # (the drawn edge still runs to the satellite).
+                fa = vmap.get(a, (a,))[0]
+                fb = vmap.get(b, (b,))[0]
+                if fa != fb and fa in depth and fb in depth:
+                    lines.append(f"  {_dot_quote(fa)} -> {_dot_quote(fb)} "
+                                 f'[id={_dot_quote("~rank_" + e["edge_id"])}, '
+                                 "weight=2];")
+                continue
+            if a not in depth:
                 continue
             hard = e["type"] in (HARD_TYPES | TAXONOMY_TYPES)
             attrs = f'id={_dot_quote(e["edge_id"])}'
@@ -212,6 +228,8 @@ def compute_layout(view):
     edge_paths = {}
     for e in doc.get("edges", []):
         eid = e.get("id")
+        if eid and eid.startswith("~rank_"):
+            continue                        # ranking-only ghosts, never drawn
         if eid and "pos" in e:
             pl = _spline_to_polyline(e["pos"])
             if len(pl) >= 2:

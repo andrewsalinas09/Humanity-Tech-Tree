@@ -509,13 +509,16 @@ export default function Home() {
         return;
       }
       clearDim(map); setCard(null); setSel(null); setSolve(null);
-      selRef.current = null; setEdgeCard(null);
+      selRef.current = null; setEdgeCard(null); litEdgeRef.current = null;
       focusRef.current = null; applyFilters(map);
     });
     map.on("mouseenter", "nodes", () => (map.getCanvas().style.cursor = "pointer"));
     map.on("mouseleave", "nodes", () => (map.getCanvas().style.cursor = ""));
     map.on("sourcedata", () => {           // re-apply dim when tiles reload
       if (selRef.current) applyDim(map, selRef.current);
+      if (litEdgeRef.current)
+        map.setFeatureState({ source: "httk", sourceLayer: "edges",
+                              id: litEdgeRef.current }, { lit: true });
     });
 
     let fitted = false;
@@ -591,10 +594,24 @@ export default function Home() {
   };
 
   const [edgeCard, setEdgeCard] = useState<any | null>(null);
+  const litEdgeRef = useRef<string | null>(null);
   const openEdge = async (eid: string) => {
     const d = await (await fetch(`${TILER}/edge/${eid}`)).json();
-    if (!d.missing) { setCard(null); setSel(null); selRef.current = null;
-                      setEdgeCard(d); setTab("Explore"); }
+    if (d.missing) return;
+    const map = mapRef.current;
+    if (map) {                       // the clicked line lights up (vivid+cased)
+      clearDim(map);
+      map.setFeatureState({ source: "httk", sourceLayer: "edges", id: eid },
+                          { lit: true });
+      litEdgeRef.current = eid;
+    }
+    setCard(null); setSel(null); selRef.current = null;
+    setEdgeCard(d); setTab("Explore");
+  };
+  const closeEdge = () => {
+    setEdgeCard(null);
+    litEdgeRef.current = null;
+    if (mapRef.current) clearDim(mapRef.current);
   };
   const edgeAction = async (kind: "cite" | "dispute" | "delete") => {
     const eid = edgeCard?.edge_id;
@@ -963,12 +980,12 @@ export default function Home() {
             <div>
               <h3 style={{ margin: "0 0 4px" }}>
                 <span style={S.link}
-                      onClick={() => { setEdgeCard(null);
+                      onClick={() => { closeEdge();
                         mapRef.current && focusOn(mapRef.current, edgeCard.from); }}>
                   {edgeCard.from_name}</span>
                 {" → "}
                 <span style={S.link}
-                      onClick={() => { setEdgeCard(null);
+                      onClick={() => { closeEdge();
                         mapRef.current && focusOn(mapRef.current, edgeCard.to); }}>
                   {edgeCard.to_name}</span>
               </h3>
@@ -1008,7 +1025,7 @@ export default function Home() {
                 <button onClick={() => edgeAction("cite")} style={S.miniBtn}>📖 cite</button>
                 <button onClick={() => edgeAction("dispute")} style={S.miniBtn}>⚑ dispute</button>
                 <button onClick={() => edgeAction("delete")} style={S.miniBtn}>🗑 delete</button>
-                <button onClick={() => setEdgeCard(null)} style={S.miniBtn}>close</button>
+                <button onClick={closeEdge} style={S.miniBtn}>close</button>
               </div>
             </div>
           )}
