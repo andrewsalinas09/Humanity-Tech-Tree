@@ -34,15 +34,18 @@ _SCALE = 0.066
 
 def importance(view):
     """The airport-map metric (user ruling): hubs vs leaves. Importance =
-    degree + transitive dependency mass (the BLAST RADIUS of ADR-0013, live),
-    log-normalized to 0..1. Computed, never stored (ADR-0026)."""
+    degree + DISTANCE-DAMPED dependency mass (blast radius of ADR-0013, but
+    each hop counts less — user 2026-08-09: raw transitive mass made root
+    ancestors like Electromagnetism outrank dense local hubs like Transistor).
+    Log-normalized to 0..1. Computed, never stored (ADR-0026)."""
     nodes = view.nodes()
     kinds = HARD_TYPES | TAXONOMY_TYPES
     deg = {n: len(view.edges_in(n, kinds)) + len(view.edges_out(n, kinds))
            for n in nodes}
+    lam = 0.35                            # tuned on live graph 2026-08-09
     mass = {}
-    for n in nodes:                       # downstream consumers, transitively
-        seen, frontier = set(), {n}
+    for n in nodes:                       # downstream consumers, damped by hop
+        seen, frontier, dm, f = {n}, {n}, 0.0, 1.0
         while frontier:
             nxt = set()
             for m in frontier:
@@ -50,9 +53,11 @@ def importance(view):
                     if e["to"] not in seen:
                         seen.add(e["to"])
                         nxt.add(e["to"])
+            f *= lam
+            dm += f * len(nxt)
             frontier = nxt
-        mass[n] = len(seen)
-    raw = {n: deg[n] + 2 * mass[n] for n in nodes}
+        mass[n] = dm
+    raw = {n: 3 * deg[n] + 2 * mass[n] for n in nodes}
     mx = max(raw.values(), default=1) or 1
     return {n: math.log1p(raw[n]) / math.log1p(mx) for n in nodes}
 
@@ -150,8 +155,10 @@ def compute_layout(view):
                 continue
             hard = e["type"] in (HARD_TYPES | TAXONOMY_TYPES)
             attrs = f'id={_dot_quote(e["edge_id"])}'
-            if not hard:                   # story edges ride along, never rank
-                attrs += ", constraint=false, weight=0"
+            # story edges DO rank (lighter): people/documents sit beside
+            # their subjects instead of stranding in a far strip, and their
+            # dashes route short and direct (user: no loop-the-loop detours)
+            attrs += ", weight=2" if hard else ", weight=1"
             lines.append(f"  {_dot_quote(a)} -> {_dot_quote(b)} [{attrs}];")
             edge_ids.append(e["edge_id"])
     lines.append("}")
