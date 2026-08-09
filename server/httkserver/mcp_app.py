@@ -126,6 +126,64 @@ def build_app(pinned=None):
         return svc.get_node(tok, node_id) if tok else _NO_CRED
 
     @app.tool()
+    def verify_citation(assertion_id: str, verdict: str, ctx: Context,
+                        model: str = None, note: str = None) -> dict:
+        """L2→L3 machine verification (ADR-0032): you fetched/checked the
+        source — does it support the claim? verdict: supported | unsupported |
+        hallucinated. Standing verifications earn reputation; bad ones cost."""
+        tok = _cred(ctx, pinned)
+        return svc.verify_citation(tok, assertion_id, verdict, model,
+                                   note) if tok else _NO_CRED
+
+    @app.tool()
+    def confirm_verification(assertion_id: str, verdict: str, ctx: Context,
+                             note: str = None) -> dict:
+        """L3→L4 HUMAN confirmation (rejected for agent credentials): a person
+        confirms the source supports the claim. verdict: supported | unsupported."""
+        tok = _cred(ctx, pinned)
+        return svc.confirm_verification(tok, assertion_id, verdict,
+                                        note) if tok else _NO_CRED
+
+    @app.tool()
+    def resolve_challenge(challenge_id: str, outcome: str, ctx: Context,
+                          demoted: list = None, note: str = None) -> dict:
+        """ADMIN: ratify a challenge (upheld | rejected). Upheld executes the
+        pre-staged remedy verbs; `demoted` assertion ids feed reputation."""
+        tok = _cred(ctx, pinned)
+        return svc.resolve_challenge(tok, challenge_id, outcome, demoted,
+                                     note) if tok else _NO_CRED
+
+    @app.tool()
+    def open_challenge(subject: str, grounds: str, ctx: Context,
+                       remedy: list = None) -> dict:
+        """Dispute something you believe is wrong (node/edge/assertion id).
+        Optionally pre-stage the fix as remedy=[{verb, params}] — executed
+        verbatim if the challenge is upheld. Votes advise; an admin ratifies."""
+        tok = _cred(ctx, pinned)
+        return svc.open_challenge(tok, subject, grounds, remedy) if tok else _NO_CRED
+
+    @app.tool()
+    def vote_challenge(challenge_id: str, support: bool, reason: str,
+                       ctx: Context) -> dict:
+        """Vote on a challenge WITH your reason (recorded forever). Weight =
+        1 + reputation, and only vested voters (3+ verified claims) count."""
+        tok = _cred(ctx, pinned)
+        return svc.vote_challenge(tok, challenge_id, support,
+                                  reason) if tok else _NO_CRED
+
+    @app.tool()
+    def list_challenges(ctx: Context) -> list:
+        """Open and resolved challenges — the dispute docket."""
+        tok = _cred(ctx, pinned)
+        return svc.list_challenges(tok) if tok else [_NO_CRED]
+
+    @app.tool()
+    def challenge_tally(challenge_id: str, ctx: Context) -> dict:
+        """Current weighted tally for a challenge (advisory to the admin)."""
+        tok = _cred(ctx, pinned)
+        return svc.challenge_tally(tok, challenge_id) if tok else _NO_CRED
+
+    @app.tool()
     def request_deletion(subject_id: str, reason: str, ctx: Context) -> dict:
         """Mark a node OR edge for deletion (ADR-0047): created-in-error nodes,
         or correct-but-no-longer-useful edges (coarse links superseded by

@@ -17,7 +17,7 @@ from httk import Store, View, realizable
 from httk import verbs as VB
 from httk.verbs import StagedFacts, Decision, Rejection
 
-from httkserver import embeds
+from httkserver import embeds, reputation
 
 
 class AuthError(Exception):
@@ -577,6 +577,189 @@ class Service:
             out["fulfilled"] = [{"request": r, "want": w,
                                  "about": sn or wn}
                                 for r, w, sn, wn in c.fetchall()]
+        return out
+
+    # -- verification & challenges (ADR-0049; events are FACTS) ----------------
+    def _all_facts(self):
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT fact_id, kind, author, body FROM facts ORDER BY seq")
+            return [{"fact_id": f, "kind": k, "author": a, "body": b}
+                    for f, k, a, b in c.fetchall()]
+
+    def _refresh_reputation(self):
+        """users.reputation is a CACHE of compute(fact log) — never authored."""
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT user_id, operator FROM users WHERE operator IS NOT NULL")
+            operators = dict(c.fetchall())
+        rep = reputation.compute(self._all_facts(), operators)
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT user_id FROM users")
+            for (uid,) in c.fetchall():
+                c.execute("UPDATE users SET reputation=%s WHERE user_id=%s",
+                          (rep.get(uid, 0), uid))
+
+    def _assertion_exists(self, assertion_id):
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT 1 FROM facts WHERE fact_id=%s AND kind='assert'",
+                      (assertion_id,))
+            return c.fetchone() is not None
+
+    def verify_citation(self, token, assertion_id, verdict, model=None, note=None):
+        """L2→L3 machine verification event (ADR-0032/0049). verdict:
+        supported | unsupported | hallucinated."""
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        if verdict not in ("supported", "unsupported", "hallucinated"):
+            return {"rejected": {"rule": "ADR-0032", "message": "bad verdict"}}
+        if not self._assertion_exists(assertion_id):
+            return {"rejected": {"rule": "E404", "message": f"{assertion_id}?"}}
+        out = self._apply(identity, [("verification.machine",
+                                      {"assertion_id": assertion_id,
+                                       "verdict": verdict,
+                                       "model": model or identity.get("model"),
+                                       "note": note})], [])
+        self._refresh_reputation()
+        return out
+
+    def confirm_verification(self, token, assertion_id, verdict, note=None):
+        """L3→L4 human confirmation (humans only — that's the rung's meaning)."""
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        if identity.get("type") != "human":
+            return {"rejected": {"rule": "ADR-0032",
+                                 "message": "L4 confirmations are human-only"}}
+        if verdict not in ("supported", "unsupported"):
+            return {"rejected": {"rule": "ADR-0032", "message": "bad verdict"}}
+        if not self._assertion_exists(assertion_id):
+            return {"rejected": {"rule": "E404", "message": f"{assertion_id}?"}}
+        out = self._apply(identity, [("verification.human",
+                                      {"assertion_id": assertion_id,
+                                       "verdict": verdict, "note": note})], [])
+        self._refresh_reputation()
+        return out
+
+    def open_challenge(self, token, subject, grounds, remedy=None):
+        """A structured dispute (ADR-0049 §7): subject + grounds + optional
+        pre-staged remedy verbs [{verb, params}]. Votes advise; ADMIN ratifies."""
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        _, view = self._kernel()
+        if not (view.node(subject) or view.edge(subject)
+                or self._assertion_exists(subject)):
+            return {"rejected": {"rule": "E404", "message": f"{subject}?"}}
+        if not grounds:
+            return {"rejected": {"rule": "ADR-0049",
+                                 "message": "a challenge needs grounds"}}
+        out = self._apply(identity, [("challenge.open",
+                                      {"subject": subject, "grounds": grounds,
+                                       "remedy": remedy or [],
+                                       "opened_by": identity.get("id")})], [])
+        out["challenge"] = out["applied"]["created"]["assertions"] or None
+        with self.pg.conn.cursor() as c:      # the open fact's id IS the handle
+            c.execute("SELECT fact_id FROM facts WHERE kind='challenge.open' "
+                      "ORDER BY seq DESC LIMIT 1")
+            out["challenge"] = c.fetchone()[0]
+        return out
+
+    def vote_challenge(self, token, challenge_id, support, reason):
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        if not reason:
+            return {"rejected": {"rule": "ADR-0049",
+                                 "message": "votes carry reasons"}}
+        ch = next((f for f in self._all_facts()
+                   if f["fact_id"] == challenge_id
+                   and f["kind"] == "challenge.open"), None)
+        if ch is None:
+            return {"rejected": {"rule": "E404", "message": f"{challenge_id}?"}}
+        return self._apply(identity, [("challenge.vote",
+                                       {"challenge_id": challenge_id,
+                                        "support": bool(support),
+                                        "reason": reason})], [])
+
+    def challenge_tally(self, token, challenge_id):
+        """Weighted tally (advisory): weight = 1 + max(0, reputation), vested
+        voters only (ADR-0049 §4); unvested votes are recorded but weigh 0."""
+        self.authenticate(token)
+        facts = self._all_facts()
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT user_id, reputation FROM users")
+            rep = dict(c.fetchall())
+        tally = {"support": 0.0, "oppose": 0.0, "votes": []}
+        seen = set()
+        for f in reversed(facts):            # latest vote per identity wins
+            if f["kind"] != "challenge.vote":
+                continue
+            b = f["body"]
+            if b.get("challenge_id") != challenge_id:
+                continue
+            who = f["author"].get("id")
+            if who in seen:
+                continue
+            seen.add(who)
+            is_vested = reputation.vested(facts, who) or False
+            with self.pg.conn.cursor() as c:
+                c.execute("SELECT is_admin FROM users WHERE user_id=%s", (who,))
+                row = c.fetchone()
+                if row and row[0]:
+                    is_vested = True
+            w = (1 + max(0, rep.get(who, 0))) if is_vested else 0
+            tally["support" if b["support"] else "oppose"] += w
+            tally["votes"].append({"by": who, "support": b["support"],
+                                   "weight": w, "vested": is_vested,
+                                   "reason": b.get("reason")})
+        return tally
+
+    def resolve_challenge(self, token, challenge_id, outcome,
+                          demoted=None, note=None):
+        """ADMIN ratifies (user ruling): outcome upheld|rejected. On upheld,
+        pre-staged remedy verbs execute under the resolver's identity with the
+        challenge as provenance; `demoted` assertion ids feed the rep engine."""
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        if not identity.get("admin"):
+            return {"rejected": {"rule": "ADMIN",
+                                 "message": "challenges are ratified by admins"}}
+        if outcome not in ("upheld", "rejected"):
+            return {"rejected": {"rule": "ADR-0049", "message": "bad outcome"}}
+        ch = next((f for f in self._all_facts()
+                   if f["fact_id"] == challenge_id
+                   and f["kind"] == "challenge.open"), None)
+        if ch is None:
+            return {"rejected": {"rule": "E404", "message": f"{challenge_id}?"}}
+        out = self._apply(identity, [("challenge.resolve",
+                                      {"challenge_id": challenge_id,
+                                       "outcome": outcome,
+                                       "opened_by": ch["body"].get("opened_by"),
+                                       "demoted": demoted or [],
+                                       "note": note})], [])
+        remedy_results = []
+        if outcome == "upheld":
+            # remedies run VERBATIM — the challenge.resolve fact is already
+            # the provenance for every one of them
+            for r in ch["body"].get("remedy", []):
+                remedy_results.append(
+                    {"verb": r.get("verb"),
+                     "result": self.execute(token, r.get("verb"),
+                                            dict(r.get("params", {})))})
+        self._refresh_reputation()
+        out["remedy_results"] = remedy_results
+        return out
+
+    def list_challenges(self, token):
+        self.authenticate(token)
+        facts = self._all_facts()
+        resolved = {f["body"]["challenge_id"]: f["body"]["outcome"]
+                    for f in facts if f["kind"] == "challenge.resolve"}
+        out = []
+        for f in facts:
+            if f["kind"] != "challenge.open":
+                continue
+            out.append({"challenge": f["fact_id"], "subject": f["body"]["subject"],
+                        "grounds": f["body"]["grounds"],
+                        "remedy": f["body"].get("remedy", []),
+                        "opened_by": f["body"].get("opened_by"),
+                        "status": resolved.get(f["fact_id"], "open")})
         return out
 
     # -- internals -------------------------------------------------------------

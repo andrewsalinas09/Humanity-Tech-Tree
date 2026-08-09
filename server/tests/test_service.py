@@ -22,6 +22,7 @@ def svc():
     pg.migrate(os.path.join(MIG, "004_users.sql"))
     pg.migrate(os.path.join(MIG, "005_admin_model.sql"))
     pg.migrate(os.path.join(MIG, "006_embeddings.sql"))
+    pg.migrate(os.path.join(MIG, "007_reputation_numeric.sql"))
     pg.wipe()
     with pg.conn.cursor() as c:
         c.execute("TRUNCATE credentials, users, requests, request_endorsements, "
@@ -184,3 +185,43 @@ def test_edge_tombstone_admin_gated_history_preserved(svc):
                       and f["body"]["edge_id"] == "e_em_tr")
     past = View(store, at=seq_before)
     assert past.edge("e_em_tr") is not None              # HISTORY PRESERVED
+
+
+def test_reputation_and_challenge_loop(svc):
+    """ADR-0049 end to end: verify -> earn; challenge -> vote -> admin ratify
+    -> remedy executes -> demotion slashes gently (-1, never clawback)."""
+    r = svc.search_similar("tok-agent", "gizmo")
+    out = svc.propose_node("tok-agent", "Gizmo", search_receipt=r["receipt"],
+                           node_id="gizmo", description="A test gizmo.")
+    aid = out["applied"]["created"]["assertions"][0]["assertion_id"]  # name
+    # machine verification earns the author L3 rep (+1) and the verifier +1
+    v = svc.verify_citation("tok-agent", aid, "supported", model="test-model")
+    assert "applied" in v
+    with svc.pg.conn.cursor() as c:
+        c.execute("SELECT reputation FROM users WHERE user_id='seed-1'")
+        assert c.fetchone()[0] == 2                    # author +1, verifier +1
+    # challenge the claim with a pre-staged remedy
+    ch = svc.open_challenge("tok-andrew", "gizmo",
+                            "test: gizmo is misnamed",
+                            remedy=[{"verb": "add_alias",
+                                     "params": {"node_id": "gizmo",
+                                                "alias": "Widget-X"}}])
+    cid = ch["challenge"]
+    assert svc.vote_challenge("tok-agent", cid, True, "agree, evidence says so")
+    t = svc.challenge_tally("tok-andrew", cid)
+    assert t["votes"][0]["vested"] is False            # <3 verified claims
+    # non-admin cannot ratify
+    bad = svc.resolve_challenge("tok-agent", cid, "upheld")
+    assert bad["rejected"]["rule"] == "ADMIN"
+    done = svc.resolve_challenge("tok-andrew", cid, "upheld", demoted=[aid])
+    assert done["remedy_results"][0]["result"].get("applied")
+    _, view = svc._kernel()
+    assert "Widget-X" in (view.field("gizmo", "aliases") or [])
+    with svc.pg.conn.cursor() as c:
+        # author: +1 (L3) -1 (demoted) = 0; verifier stance now bad-vouch -2
+        # seed-1 was both author and verifier: 1 - 1 - 2 = -2
+        c.execute("SELECT reputation FROM users WHERE user_id='seed-1'")
+        assert c.fetchone()[0] == -2
+        # andrew: +3 for the upheld challenge (opened_by), minus agent rollup -1.5
+        c.execute("SELECT reputation FROM users WHERE user_id='andrew'")
+        assert float(c.fetchone()[0]) == 1.5
