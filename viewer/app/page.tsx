@@ -404,10 +404,10 @@ export default function Home() {
                 </div>))}
               {board.length > 0 && (
                 <div>
-                  <h3 style={{ margin: "16px 0 4px" }}>Karma</h3>
+                  <h3 style={{ margin: "16px 0 4px" }}>Ink</h3>
                   {board.map((b) => (
                     <div key={b.id} style={{ fontSize: 13 }}>
-                      {b.points} · {b.id} <small style={{ opacity: 0.5 }}>{b.type}</small>
+                      🖋 {b.ink} · {b.id} <small style={{ opacity: 0.5 }}>{b.type}</small>
                     </div>))}
                 </div>)}
             </div>
@@ -420,9 +420,12 @@ export default function Home() {
                   <div key={b.id} style={{ ...S.reqBox, cursor: "pointer" }}
                        onClick={() => openWho(b.id)}>
                     <b>#{i + 1} {b.id}</b>{" "}
-                    <small style={{ opacity: 0.5 }}>{b.type}</small>
+                    <small style={{ opacity: 0.5 }}>
+                      {b.type}{b.operator ? ` · runs under ${b.operator}` : ""}
+                    </small>
                     <div style={{ fontSize: 12.5, opacity: 0.7 }}>
-                      {b.points} karma · {b.facts} facts on the record
+                      🖋 {b.ink} ink · rep {b.reputation} · {b.facts} facts
+                      on the record
                     </div>
                   </div>))}
               </>)}
@@ -432,7 +435,11 @@ export default function Home() {
                     ← back</button>
                   <h3 style={{ margin: "8px 0 2px" }}>{who.id}</h3>
                   <div style={{ opacity: 0.65, fontSize: 13, marginBottom: 8 }}>
-                    {who.points} karma ·{" "}
+                    🖋 {who.ink} ink · rep {who.reputation}
+                    {who.operator ? ` · runs under ${who.operator}` : ""}
+                    {who.operates?.length
+                      ? ` · operates: ${who.operates.join(", ")}` : ""}
+                    <br />
                     {Object.entries(who.counts as Record<string, number>)
                       .map(([k, v]) => `${v} ${k}`).join(" · ")}
                   </div>

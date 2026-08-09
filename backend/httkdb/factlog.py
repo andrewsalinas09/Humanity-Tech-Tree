@@ -159,6 +159,16 @@ class PgFactLog:
                 "value=EXCLUDED.value, assertion_fact_id=EXCLUDED.assertion_fact_id, "
                 "seq=EXCLUDED.seq WHERE current_fields.seq < EXCLUDED.seq",
                 (body["subject"], body["field"], Jsonb(body["value"]), fact_id, seq))
+        elif kind == "node.tombstone":
+            # ADR-0047: projections drop the node + incident edges; the log
+            # keeps everything (as-of reads before the tombstone still see it)
+            cur.execute("DELETE FROM edge_identities WHERE from_node=%s "
+                        "OR to_node=%s", (body["node_id"], body["node_id"]))
+            cur.execute("DELETE FROM node_identities WHERE node_id=%s",
+                        (body["node_id"],))
+        elif kind == "edge.tombstone":
+            cur.execute("DELETE FROM edge_identities WHERE edge_id=%s",
+                        (body["edge_id"],))
         elif kind == "retract":
             self._recompute_field_for(cur, body["target"])
         elif kind == "cite":

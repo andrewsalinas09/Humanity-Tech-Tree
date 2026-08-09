@@ -18,15 +18,22 @@ def svc():
         pytest.skip(f"no postgres: {e}")
     pg.migrate(os.path.join(MIG, "001_init.sql"))
     pg.migrate(os.path.join(MIG, "002_server.sql"))
+    pg.migrate(os.path.join(MIG, "003_requests.sql"))
+    pg.migrate(os.path.join(MIG, "004_users.sql"))
+    pg.migrate(os.path.join(MIG, "005_admin_model.sql"))
     pg.wipe()
     with pg.conn.cursor() as c:
-        c.execute("TRUNCATE identities, decision_tickets, search_receipts "
-                  "RESTART IDENTITY CASCADE")
+        c.execute("TRUNCATE credentials, users, requests, request_endorsements, "
+                  "decision_tickets, search_receipts RESTART IDENTITY CASCADE")
     pg.conn.commit()
     s = Service(pg)
     s.create_identity("tok-andrew", {"type": "human", "id": "andrew"})
     s.create_identity("tok-agent", {"type": "agent", "id": "seed-1",
+                                    "operator": "andrew",
                                     "model": "claude-fable-5"}, budget_per_hour=1000)
+    with pg.conn.cursor() as c:      # 005 grants andrew admin; truncation undid it
+        c.execute("UPDATE users SET is_admin=TRUE WHERE user_id='andrew'")
+    pg.conn.commit()
     yield s
     pg.close()
 
@@ -48,7 +55,8 @@ def test_identity_is_stamped_server_side(svc):
 
 
 def test_budget_enforced(svc):
-    svc.create_identity("tok-tiny", {"type": "agent", "id": "tiny"}, budget_per_hour=2)
+    svc.create_identity("tok-tiny", {"type": "agent", "id": "tiny",
+                                     "operator": "andrew"}, budget_per_hour=2)
     r = svc.search_similar("tok-tiny", "aaa")
     svc.propose_node("tok-tiny", "Aaa", search_receipt=r["receipt"])   # writes 2 facts
     with pytest.raises(BudgetExceeded):
@@ -138,3 +146,40 @@ def test_open_tickets_lists_the_queue(svc):
     svc.execute("tok-agent", "add_ingredient", {"product": "w", "ingredient": "ag"})
     q = svc.open_tickets("tok-andrew")
     assert len(q) == 1 and q[0]["verb"] == "add_ingredient"    # the check queue exists
+
+
+def test_delete_ticket_is_admin_gated(svc):
+    r = svc.search_similar("tok-agent", "oops")
+    svc.propose_node("tok-agent", "Oops Node", search_receipt=r["receipt"],
+                     node_id="oops-node")
+    t = svc.request_deletion("tok-agent", "oops-node", "created in error")
+    assert t["ticket"]
+    # the requesting agent cannot approve its own deletion
+    out = svc.resolve_decision("tok-agent", t["ticket"], {"key": "approve"})
+    assert out["rejected"]["rule"] == "ADMIN"
+    # the admin can; the node vanishes from the view but the log keeps it
+    out = svc.resolve_decision("tok-andrew", t["ticket"], {"key": "approve"})
+    assert "applied" in out
+    _, view = svc._kernel()
+    assert view.node("oops-node") is None
+    assert "oops-node" in view.tombstoned
+
+
+def test_edge_tombstone_admin_gated_history_preserved(svc):
+    svc.pg.quick(lambda cr: (cr.create_node("em"), cr.create_node("tr")))
+    svc.pg.quick(lambda cr: cr.create_edge("e_em_tr", "em", "tr", "ENABLES"))
+    t = svc.request_deletion("tok-agent", "e_em_tr",
+                             "correct but superseded by the finer chain")
+    assert svc.resolve_decision("tok-agent", t["ticket"],
+                                {"key": "approve"})["rejected"]["rule"] == "ADMIN"
+    out = svc.resolve_decision("tok-andrew", t["ticket"], {"key": "approve"})
+    assert "applied" in out
+    store, view = svc._kernel()
+    assert view.edge("e_em_tr") is None                  # gone from the view
+    assert view.node("em") and view.node("tr")           # endpoints untouched
+    from httk import View
+    seq_before = next(f["recorded_at"] for f in store.facts
+                      if f["kind"] == "edge.create"
+                      and f["body"]["edge_id"] == "e_em_tr")
+    past = View(store, at=seq_before)
+    assert past.edge("e_em_tr") is not None              # HISTORY PRESERVED

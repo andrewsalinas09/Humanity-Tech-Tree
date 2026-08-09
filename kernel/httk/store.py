@@ -88,21 +88,38 @@ class View:
     def __init__(self, store, at=None):
         self.at = at if at is not None else len(store.facts) + 1
         self._nodes, self._edges, self._fields = {}, {}, {}
-        retracted = set()
+        retracted, tombstoned, edge_tombstoned = set(), set(), set()
         for f in store.facts:
             if f["recorded_at"] > self.at:
                 continue
             b, k = f["body"], f["kind"]
             if k == "retract":
                 retracted.add(b["target"])
+            elif k == "node.tombstone":
+                # ADR-0047: created-in-error, admin-approved removal. A forward
+                # fact (nothing deleted from the log); the view hides the node
+                # and every incident edge. Two-pass ⇒ order-independent
+                # (ADR-0023); as-of reads before the tombstone still see it.
+                tombstoned.add(b["node_id"])
+            elif k == "edge.tombstone":
+                # ADR-0047 §edges: CORRECT-but-no-longer-useful links (coarse
+                # history superseded by richer structure) retire the same way —
+                # admin-approved forward fact, history fully preserved as-of.
+                edge_tombstoned.add(b["edge_id"])
+        self.tombstoned = tombstoned
+        self.edge_tombstoned = edge_tombstoned
         for f in store.facts:
             if f["recorded_at"] > self.at or f["fact_id"] in retracted:
                 continue
             b, k = f["body"], f["kind"]
             if k == "node.create":
-                self._nodes[b["node_id"]] = dict(b)
+                if b["node_id"] not in tombstoned:
+                    self._nodes[b["node_id"]] = dict(b)
             elif k == "edge.create":
-                self._edges[b["edge_id"]] = dict(b)
+                if (b["edge_id"] not in edge_tombstoned
+                        and b["from"] not in tombstoned
+                        and b["to"] not in tombstoned):
+                    self._edges[b["edge_id"]] = dict(b)
             elif k == "assert":
                 # latest-at-T wins per (subject, field): facts are in record order
                 self._fields[(b["subject"], b["field"])] = f["fact_id"], b["value"]

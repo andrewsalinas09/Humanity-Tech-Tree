@@ -107,6 +107,15 @@ def build_app(pinned=None):
         return svc.get_node(tok, node_id) if tok else _NO_CRED
 
     @app.tool()
+    def request_deletion(subject_id: str, reason: str, ctx: Context) -> dict:
+        """Mark a node OR edge for deletion (ADR-0047): created-in-error nodes,
+        or correct-but-no-longer-useful edges (coarse links superseded by
+        richer structure). Opens a ticket only an ADMIN can approve; approval
+        tombstones it — the log keeps full history, the view hides it."""
+        tok = _cred(ctx, pinned)
+        return svc.request_deletion(tok, subject_id, reason) if tok else _NO_CRED
+
+    @app.tool()
     def post_request(want: str, ctx: Context, subject_node: str = None,
                      wanted_name: str = None, wanted_description: str = None,
                      notes: str = None, offered_sources: list = None) -> dict:

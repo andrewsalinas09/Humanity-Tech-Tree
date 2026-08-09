@@ -89,22 +89,50 @@ class Service:
         return hashlib.sha256(token.encode()).hexdigest()
 
     def create_identity(self, token, identity, budget_per_hour=1000):
+        """User + first credential (user DB rulings 2026-08-09): identity ≠
+        credential. Agents REQUIRE an operator — blame rolls up to people."""
+        uid = identity.get("id")
+        kind = identity.get("type", "human")
+        operator = identity.get("operator")
+        if kind == "agent" and not operator:
+            raise AuthError(f"agent '{uid}' needs an operator (accountability "
+                            "chain: no orphan agents)")
         with self.pg.conn.cursor() as c:
             c.execute(
-                "INSERT INTO identities (token_hash, identity, budget_per_hour) "
+                "INSERT INTO users (user_id, display_name, kind, operator, model) "
+                "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (user_id) DO NOTHING",
+                (uid, identity.get("display_name", uid), kind, operator,
+                 identity.get("model")))
+            c.execute(
+                "INSERT INTO credentials (token_hash, user_id, budget_per_hour) "
                 "VALUES (%s,%s,%s) ON CONFLICT (token_hash) DO UPDATE "
-                "SET identity=EXCLUDED.identity, budget_per_hour=EXCLUDED.budget_per_hour",
-                (self.hash_token(token), Jsonb(identity), budget_per_hour))
+                "SET user_id=EXCLUDED.user_id, "
+                "budget_per_hour=EXCLUDED.budget_per_hour, revoked_at=NULL",
+                (self.hash_token(token), uid, budget_per_hour))
         self.pg.conn.commit()
+
+    def revoke_credential(self, token):
+        with self.pg.conn.cursor() as c:
+            c.execute("UPDATE credentials SET revoked_at=now() "
+                      "WHERE token_hash=%s", (self.hash_token(token),))
 
     def authenticate(self, token):
         with self.pg.conn.cursor() as c:
-            c.execute("SELECT identity, budget_per_hour FROM identities "
-                      "WHERE token_hash=%s", (self.hash_token(token),))
+            c.execute(
+                "SELECT u.user_id, u.kind, u.model, u.is_admin, "
+                "c.budget_per_hour "
+                "FROM credentials c JOIN users u ON u.user_id = c.user_id "
+                "WHERE c.token_hash=%s AND c.revoked_at IS NULL",
+                (self.hash_token(token),))
             row = c.fetchone()
         if not row:
             raise AuthError("unknown credential")
-        return row[0], row[1]
+        ident = {"type": row[1], "id": row[0]}
+        if row[2]:
+            ident["model"] = row[2]
+        if row[3]:
+            ident["admin"] = True
+        return ident, row[4]
 
     def _check_budget(self, identity, budget):
         with self.pg.conn.cursor() as c:
@@ -240,6 +268,30 @@ class Service:
             return out
         return self._apply(identity, result.facts, result.notes)
 
+    def request_deletion(self, token, subject_id, reason):
+        """ADR-0047 (Q-23): anyone may MARK a node or edge for deletion —
+        created-in-error nodes, or correct-but-no-longer-useful edges (coarse
+        history superseded by richer structure). Only an ADMIN approves.
+        Approval writes a tombstone fact — the log keeps everything; as-of
+        reads before the tombstone still see it (HISTORY PRESERVED)."""
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        _, view = self._kernel()
+        if view.node(subject_id):
+            kind = "node"
+        elif view.edge(subject_id):
+            kind = "edge"
+        else:
+            return {"rejected": {"rule": "E404", "message": f"{subject_id}?"}}
+        if not reason:
+            return {"rejected": {"rule": "ADR-0047",
+                                 "message": "deletion requires a reason"}}
+        return self._open_ticket(
+            identity, "delete",
+            {"subject": subject_id, "kind": kind, "reason": reason},
+            f"ADMIN-ONLY: tombstone {kind} '{subject_id}' — {reason}",
+            [{"key": "approve"}, {"key": "deny"}])
+
     def resolve_decision(self, token, ticket_id, choice, justification=None):
         identity, budget = self.authenticate(token)
         self._check_budget(identity, budget)
@@ -266,7 +318,27 @@ class Service:
         merged = _merge_choice(verb, params, choice)
         if justification:
             merged.setdefault("justification", justification)
-        if verb == "propose_node":
+        if verb in ("delete", "delete_node"):
+            # ADR-0047: the wrongness stakes of hiding truth (ADR-0015) put
+            # tombstones behind the admin gate — requesting is open, approving
+            # is not
+            if not identity.get("admin"):
+                return {"rejected": {"rule": "ADMIN",
+                                     "message": "delete tickets can only be "
+                                                "approved by an admin"}}
+            if choice.get("key") == "approve":
+                subj = params.get("subject") or params.get("node_id")
+                kind = params.get("kind", "node")
+                fact = (("edge.tombstone", {"edge_id": subj,
+                                            "reason": params.get("reason", "")})
+                        if kind == "edge" else
+                        ("node.tombstone", {"node_id": subj,
+                                            "reason": params.get("reason", "")}))
+                out = self._apply(identity, [fact],
+                                  [f"tombstone approved: {params.get('reason')}"])
+            else:
+                out = {"denied": ticket_id}
+        elif verb == "propose_node":
             out = self.propose_node(token, **merged)
         else:
             out = self.execute(token, verb, merged)
@@ -373,10 +445,10 @@ class Service:
                       "notes=COALESCE(%s, notes) WHERE request_id=%s",
                       (Jsonb(identity), Jsonb(links), note, request_id))
             pts = 3 + endorsements
-            c.execute("UPDATE identities SET points = points + %s "
-                      "WHERE identity->>'id' = %s", (pts, identity.get("id")))
-            c.execute("UPDATE identities SET points = points + 1 "
-                      "WHERE identity->>'id' = %s", (requested_by.get("id"),))
+            c.execute("UPDATE users SET ink = ink + %s WHERE user_id = %s",
+                      (pts, identity.get("id")))
+            c.execute("UPDATE users SET ink = ink + 1 WHERE user_id = %s",
+                      (requested_by.get("id"),))
         return {"fulfilled": request_id, "points_earned": pts}
 
     def reopen_request(self, token, request_id, reason):
@@ -394,19 +466,20 @@ class Service:
         return {"reopened": request_id}
 
     def leaderboard(self, token, k=20):
-        """Points + lifetime contribution counts, straight off the fact log —
-        the user database's public face (user ruling 2026-08-09)."""
+        """Karma + reputation + lifetime contribution counts — the user
+        database's public face (everything public, user ruling 2026-08-09)."""
         self.authenticate(token)
         with self.pg.conn.cursor() as c:
             c.execute(
-                "SELECT i.identity->>'id', i.identity->>'type', i.points, "
+                "SELECT u.user_id, u.kind, u.operator, u.ink, u.reputation, "
                 "       COALESCE(f.n, 0) AS facts "
-                "FROM identities i LEFT JOIN "
+                "FROM users u LEFT JOIN "
                 "  (SELECT author->>'id' AS id, count(*) AS n FROM facts "
-                "   GROUP BY author->>'id') f ON f.id = i.identity->>'id' "
-                "ORDER BY i.points DESC, facts DESC LIMIT %s", (k,))
-            return [{"id": i, "type": t, "points": p, "facts": n}
-                    for i, t, p, n in c.fetchall()]
+                "   GROUP BY author->>'id') f ON f.id = u.user_id "
+                "ORDER BY u.ink DESC, facts DESC LIMIT %s", (k,))
+            return [{"id": i, "type": t, "operator": op, "ink": ka,
+                     "reputation": rep, "facts": n}
+                    for i, t, op, ka, rep, n in c.fetchall()]
 
     def contributions(self, token, identity_id, k=40):
         """Everything an identity did — free, because every fact is stamped
@@ -414,10 +487,17 @@ class Service:
         self.authenticate(token)
         out = {"id": identity_id}
         with self.pg.conn.cursor() as c:
-            c.execute("SELECT points FROM identities WHERE identity->>'id'=%s",
-                      (identity_id,))
+            c.execute("SELECT kind, operator, ink, reputation, bio, link "
+                      "FROM users WHERE user_id=%s", (identity_id,))
             row = c.fetchone()
-            out["points"] = row[0] if row else 0
+            if row:
+                out.update(kind=row[0], operator=row[1], ink=row[2],
+                           reputation=row[3], bio=row[4], link=row[5])
+            else:
+                out.update(kind=None, operator=None, ink=0, reputation=0)
+            c.execute("SELECT user_id FROM users WHERE operator=%s "
+                      "ORDER BY user_id", (identity_id,))
+            out["operates"] = [r[0] for r in c.fetchall()]
             c.execute("SELECT kind, count(*) FROM facts "
                       "WHERE author->>'id'=%s GROUP BY kind", (identity_id,))
             out["counts"] = dict(c.fetchall())
