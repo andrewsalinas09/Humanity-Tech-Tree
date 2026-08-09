@@ -168,6 +168,11 @@ def tile(z: int, x: int, y: int):
         px, py = _lnglat_to_tilepx(lng, lat, z, x, y)
         if not (0 <= px < EXTENT and 0 <= py < EXTENT):
             continue          # points live in exactly ONE tile (no icon doubling)
+        # anchors EXACTLY on a tile seam get dropped by symbol placement
+        # (logic-gate at lat 0.0 vanished — the 'hidden bus node' bug);
+        # nudge half a tile-unit into the interior, visually imperceptible
+        px = min(max(px, 0.5), EXTENT - 0.5)
+        py = min(max(py, 0.5), EXTENT - 0.5)
         nd = view.node(n) or {}
         nodes_feats.append({
             "geometry": {"type": "Point", "coordinates": [px, py]},

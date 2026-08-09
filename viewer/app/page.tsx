@@ -420,10 +420,10 @@ export default function Home() {
       // a manually demerged family retires its lifted stand-in edges
       ["any", ["!", ["get", "lifted"]],
        ["!", ["in", ["get", "vfamily"], fams]]],
-      // covered history hides unless toggled on (or lit by a focused closure)
+      // covered history hides unless toggled on — hidden means HIDDEN, even
+      // inside a focused closure (user ruling)
       ...(showShadowedRef.current ? [] :
-        [["any", ["!", ["get", "shadowed"]],
-          ["in", ["get", "edge_id"], litE]]])] as any;
+        [["!", ["get", "shadowed"]]])] as any;
     map.setFilter("nodes", showNode);
     map.setFilter("node-ring", ["all", ["!", ["get", "cited"]], showNode]);
     map.setFilter("edges", ["all", ["!", ["get", "ghost"]], showEdge]);
