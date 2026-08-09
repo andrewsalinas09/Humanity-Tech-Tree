@@ -35,12 +35,24 @@ def _world():
 def test_tb072_bootstrap_chain_lights_and_traces():
     v = View(_world())
     cap = capabilities(v)
-    assert cap[("quartz", "purity")][0] == 0.995        # extraction floor
-    assert cap[("silicon", "purity")][0] == 0.999999999  # siemens lit via smelter
+    assert cap[("quartz", "purity")][0][0] == 0.995      # extraction floor
+    assert cap[("silicon", "purity")][-1][0] == 0.999999999  # top rung: siemens
+    assert cap[("silicon", "purity")][0][0] == 0.98           # bootstrap rung: smelter
     r = realizable(v, "transistor")
     assert r.existence is Tri.SAT
     routes = {(x["attr"], x["via"]) for x in r.via}
     assert ("purity", "siemens") in routes               # one-hop trace
+
+
+def test_attribution_credits_the_minimal_rung():
+    """The smelter bootstrapped Siemens — the trace must SAY so: Siemens' own
+    input request (>0.979) is credited to the smelter's 0.98 rung, never to
+    Siemens itself (no self-crediting loops in traces)."""
+    v = View(_world())
+    r = realizable(v, "siemens")
+    assert r.existence is Tri.SAT
+    hit = next(x for x in r.via if x["edge"] == "e_si_sie")
+    assert hit["via"] == "smelter" and hit["value"] == 0.98
 
 
 def test_tb073_no_bootstrap_stays_dark_with_named_gap():
@@ -78,7 +90,7 @@ def test_tb075_relative_op_unbounded_with_base_dark_without():
     add_optimizer(View(s), target="silicon", process="zone-refining",
                   attr="purity", op="MULTIPLY", value=0.1).apply(s)
     cap = capabilities(View(s))
-    assert cap[("silicon", "purity")][0] is UNBOUNDED    # iterate as needed
+    assert cap[("silicon", "purity")][-1][0] is UNBOUNDED  # iterate as needed
     r = realizable(View(s), "transistor")
     assert r.existence is Tri.SAT
     # without ANY set (fresh world): relative op alone stays dark

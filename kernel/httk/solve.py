@@ -52,12 +52,13 @@ def capabilities(view):
     for e in view._edges.values():
         for eff in (view.field(e["edge_id"], "effect", []) or []):
             effects.append((e["from"], e["to"], e["edge_id"], eff))
-    cap = {}
+    rungs = {}          # (mat, attr) -> {proc: (value, edge_id)} — the LADDER
 
     def achieved(node, attr):
-        got = cap.get((node, attr))
-        if got is not None:
-            return got[0]
+        got = rungs.get((node, attr))
+        if got:
+            vals = [v for v, _ in got.values()]
+            return UNBOUNDED if UNBOUNDED in vals else max(vals)
         return view.field(node, f"attrs.{attr}")   # legacy/simple attrs
 
     def lit(proc):
@@ -84,11 +85,17 @@ def capabilities(view):
                 if base is None:
                     continue                        # keystone: SET missing
                 v = UNBOUNDED
-            cur = cap.get((mat, attr))
+            slot = rungs.setdefault((mat, attr), {})
+            cur = slot.get(proc)
             if cur is None or _better(v, cur[0]):
-                cap[(mat, attr)] = (v, proc, eid)
+                slot[proc] = (v, eid)
                 changed = True
-    return cap
+    # ladders sorted ascending — attribution picks the MINIMAL satisfying
+    # rung (bootstrap-honest: the smelter's 0.98 credits the smelter, even
+    # though Siemens' 9N also covers it; no self-crediting loops in traces)
+    return {k: sorted(((v, p, e) for p, (v, e) in slot.items()),
+                      key=lambda r: (r[0] is UNBOUNDED, r[0] if r[0] is not UNBOUNDED else 0))
+            for k, slot in rungs.items()}
 
 
 def _cmp(val, op, target):
@@ -194,18 +201,21 @@ def _check_constraints(view, edge, gaps, unfit):
         cap = capabilities(view)
         view._capability_cache = cap
     for c in cons:
-        got = cap.get((edge["from"], c["attr"]))
+        ladder = cap.get((edge["from"], c["attr"])) or []
         declared = view.field(edge["from"], f"attrs.{c['attr']}")
-        if got is not None:
-            v, proc, veid = got
-            if v is UNBOUNDED or _cmp(v, c["op"], c["value"]):
+        if ladder:
+            hit = next(((v, p, e) for v, p, e in ladder
+                        if v is UNBOUNDED or _cmp(v, c["op"], c["value"])), None)
+            if hit is not None:            # minimal satisfying rung gets credit
+                v, proc, veid = hit
                 tri = Tri.SAT
                 getattr(view, "_solve_via", []).append(
                     {"edge": edge["edge_id"], "attr": c["attr"],
                      "via": proc, "via_edge": veid,
                      "value": None if v is UNBOUNDED else v})
             else:
-                tri = Tri.UNKNOWN               # nearest missing rung, bountyable
+                v, proc, _ = ladder[-1]    # best reached — the nearest rung
+                tri = Tri.UNKNOWN          # bountyable, never 'impossible'
                 gaps.append((edge["edge_id"],
                              f"'{c['attr']}' reaches {v} via {proc} — short of "
                              f"{c['op']} {c['value']}; a further process is "
