@@ -239,6 +239,24 @@ class Service:
         return {"existence": r.existence.value, "fitness": r.fitness.value,
                 "gaps": r.gaps, "unfit": r.unfit}
 
+    def get_edge(self, token, edge_id):
+        """An edge's endpoints and texture — never guess endpoints from ids
+        (agent friction 2026-08-09: ids like e_tr_g don't encode them)."""
+        self.authenticate(token)
+        _, view = self._kernel()
+        e = view.edge(edge_id)
+        if e is None:
+            return {"missing": edge_id}
+        return {"edge_id": edge_id, "from": e["from"], "to": e["to"],
+                "type": e["type"], "qualifier": e.get("qualifier"),
+                "from_name": view.field(e["from"], "name") or e["from"],
+                "to_name": view.field(e["to"], "name") or e["to"],
+                "justification": view.field(edge_id, "justification"),
+                "start_date": view.field(edge_id, "start_date"),
+                "constraints": view.field(edge_id, "constraints", []) or [],
+                "citation": view.field(edge_id, "citation"),
+                "shadowed_by": view.shadowed_by(edge_id)}
+
     def get_node(self, token, node_id):
         self.authenticate(token)
         _, view = self._kernel()

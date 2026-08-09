@@ -121,9 +121,19 @@ def build_app(pinned=None):
 
     @app.tool()
     def get_node(node_id: str, ctx: Context) -> dict:
-        """A node's identity, fields (with assertion ids), and edges both directions."""
+        """A node's identity, fields, and edges both directions. Shape:
+        {node, fields: {name: {value, assertion}, ...}, edges_in, edges_out}
+        — the per-field `assertion` id is what attach_citation and
+        confirm/verify target."""
         tok = _cred(ctx, pinned)
         return svc.get_node(tok, node_id) if tok else _NO_CRED
+
+    @app.tool()
+    def get_edge(edge_id: str, ctx: Context) -> dict:
+        """An edge's TRUE endpoints (never guess from the id) + its texture:
+        justification, dates, constraints, citation, shadowed_by."""
+        tok = _cred(ctx, pinned)
+        return svc.get_edge(tok, edge_id) if tok else _NO_CRED
 
     @app.tool()
     def verify_citation(assertion_id: str, verdict: str, ctx: Context,
