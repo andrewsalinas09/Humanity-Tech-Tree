@@ -445,6 +445,91 @@ def deletions(token: str = "tok-andrew"):
     return _get_svc().deletion_records(token)
 
 
+# -- authoring proxies (the viewer is a full client; dev token default) -------
+@app.post("/gate")
+def gate(body: dict = Body(...)):
+    return _get_svc().search_similar(body.get("token", "tok-andrew"),
+                                     body["query"])
+
+
+@app.post("/propose")
+def propose(body: dict = Body(...)):
+    return _get_svc().propose_node(
+        body.get("token", "tok-andrew"), body["name"],
+        body.get("category", "TECHNOLOGY"), body.get("validity"),
+        body.get("search_receipt"), body.get("duplicate_resolution"),
+        body.get("node_id"), body.get("description"))
+
+
+@app.post("/verb")
+def verb(body: dict = Body(...)):
+    return _get_svc().execute(body.get("token", "tok-andrew"),
+                              body["name"], body.get("params", {}))
+
+
+@app.get("/tickets")
+def tickets(token: str = "tok-andrew"):
+    return _get_svc().open_tickets(token)
+
+
+@app.post("/tickets/{ticket_id}/resolve")
+def ticket_resolve(ticket_id: int, body: dict = Body(...)):
+    return _get_svc().resolve_decision(body.get("token", "tok-andrew"),
+                                       ticket_id, body["choice"],
+                                       body.get("justification"))
+
+
+@app.get("/challenges")
+def challenges(token: str = "tok-andrew"):
+    return _get_svc().list_challenges(token)
+
+
+@app.post("/challenges")
+def challenge_open(body: dict = Body(...)):
+    return _get_svc().open_challenge(body.get("token", "tok-andrew"),
+                                     body["subject"], body["grounds"],
+                                     body.get("remedy"))
+
+
+@app.get("/challenges/{challenge_id}/tally")
+def challenge_tally(challenge_id: str, token: str = "tok-andrew"):
+    return _get_svc().challenge_tally(token, challenge_id)
+
+
+@app.post("/challenges/{challenge_id}/vote")
+def challenge_vote(challenge_id: str, body: dict = Body(...)):
+    return _get_svc().vote_challenge(body.get("token", "tok-andrew"),
+                                     challenge_id, body["support"],
+                                     body.get("reason", ""))
+
+
+@app.post("/challenges/{challenge_id}/resolve")
+def challenge_resolve(challenge_id: str, body: dict = Body(...)):
+    return _get_svc().resolve_challenge(body.get("token", "tok-andrew"),
+                                        challenge_id, body["outcome"],
+                                        body.get("demoted"), body.get("note"))
+
+
+@app.post("/delete-request")
+def delete_request(body: dict = Body(...)):
+    return _get_svc().request_deletion(body.get("token", "tok-andrew"),
+                                       body["subject_id"], body["reason"])
+
+
+@app.get("/nodefields/{node_id}")
+def nodefields(node_id: str, token: str = "tok-andrew"):
+    """Fields WITH assertion ids — what citing and confirming target."""
+    return _get_svc().get_node(token, node_id)
+
+
+@app.post("/confirm")
+def confirm(body: dict = Body(...)):
+    return _get_svc().confirm_verification(body.get("token", "tok-andrew"),
+                                           body["assertion_id"],
+                                           body.get("verdict", "supported"),
+                                           body.get("note"))
+
+
 # The trust visual language on a WHITE world (user ruling). Nodes render as
 # little books (client-registered images 'book' + 'book-ring'); selection
 # dimming rides feature-state 'dim' set by the viewer.
