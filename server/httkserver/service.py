@@ -595,8 +595,10 @@ class Service:
         with self.pg.conn.cursor() as c:
             c.execute("SELECT user_id FROM users")
             for (uid,) in c.fetchall():
-                c.execute("UPDATE users SET reputation=%s WHERE user_id=%s",
-                          (rep.get(uid, 0), uid))
+                c.execute("UPDATE users SET reputation=%s, "
+                          "max_reputation=GREATEST(max_reputation, %s) "
+                          "WHERE user_id=%s",
+                          (rep.get(uid, 0), rep.get(uid, 0), uid))
 
     def _assertion_exists(self, assertion_id):
         with self.pg.conn.cursor() as c:
