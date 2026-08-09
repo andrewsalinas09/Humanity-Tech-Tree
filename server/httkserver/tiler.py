@@ -426,6 +426,11 @@ def contributions(identity_id: str, token: str = "tok-andrew"):
     return _get_svc().contributions(token, identity_id)
 
 
+@app.get("/deletions")
+def deletions(token: str = "tok-andrew"):
+    return _get_svc().deletion_records(token)
+
+
 # The trust visual language on a WHITE world (user ruling). Nodes render as
 # little books (client-registered images 'book' + 'book-ring'); selection
 # dimming rides feature-state 'dim' set by the viewer.

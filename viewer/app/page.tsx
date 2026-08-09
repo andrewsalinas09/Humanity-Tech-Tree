@@ -100,6 +100,10 @@ export default function Home() {
   };
 
   const [who, setWho] = useState<any | null>(null);
+  const [dels, setDels] = useState<any[]>([]);
+  const loadDeletions = async () => {
+    setDels(await (await fetch(`${TILER}/deletions`)).json());
+  };
   const loadLeaders = async () => {
     setBoard(await (await fetch(`${TILER}/leaderboard`)).json());
     setWho(null);
@@ -325,7 +329,8 @@ export default function Home() {
           <button key={t}
                   onClick={() => { setTab(t);
                                    if (t === "Bounties") loadRequests();
-                                   if (t === "Leaders") loadLeaders(); }}
+                                   if (t === "Leaders") loadLeaders();
+                                   if (t === "Changes") loadDeletions(); }}
                   style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
             {t}
           </button>
@@ -464,11 +469,30 @@ export default function Home() {
                 </div>)}
             </div>
           )}
-          {tab !== "Bounties" && tab !== "Leaders" && !card &&
+          {tab === "Changes" && (
+            <div>
+              <h3 style={{ margin: "0 0 4px" }}>Removed from view</h3>
+              <p style={{ opacity: 0.6, fontSize: 12.5, marginTop: 0 }}>
+                The public record (ADR-0047): nothing is ever deleted from the
+                log — these are hidden from the map, on the books forever.</p>
+              {dels.length === 0 && <p style={{ opacity: 0.5 }}>Nothing removed.</p>}
+              {dels.map((d) => (
+                <div key={d.seq} style={S.reqBox}>
+                  <b>{d.subject}</b>{" "}
+                  <small style={{ opacity: 0.55 }}>{d.kind} · seq {d.seq}</small>
+                  <div style={{ fontSize: 12.5, opacity: 0.75 }}>{d.reason}</div>
+                  <div style={{ fontSize: 12, opacity: 0.55 }}>
+                    marked by {d.marked_by ?? "?"} · approved by {d.approved_by}
+                  </div>
+                </div>))}
+            </div>
+          )}
+          {!["Bounties", "Leaders", "Changes"].includes(tab) && !card &&
             <p style={{ opacity: 0.6 }}>Click a node — or search, upper
             right. Red ring = needs citation. Faded = nobody vouched yet.
             Everything builds from zero.</p>}
-          {tab !== "Bounties" && tab !== "Leaders" && card && !card.missing && (
+          {!["Bounties", "Leaders", "Changes"].includes(tab) && card
+            && !card.missing && (
             <div>
               {card.image_url &&
                 <img src={card.image_url} alt="" style={S.img} />}

@@ -465,6 +465,27 @@ class Service:
                                  "message": "not found or not fulfilled"}}
         return {"reopened": request_id}
 
+    def deletion_records(self, token, k=100):
+        """The PUBLIC removal record (ADR-0047 §5): every tombstone with who
+        marked it, who approved it, and why. Off the map, never off the books."""
+        self.authenticate(token)
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT seq, kind, body, author, wall_time FROM facts "
+                      "WHERE kind IN ('node.tombstone','edge.tombstone') "
+                      "ORDER BY seq DESC LIMIT %s", (k,))
+            stones = [{"seq": s, "kind": kd.split(".")[0],
+                       "subject": b.get("node_id") or b.get("edge_id"),
+                       "reason": b.get("reason", ""),
+                       "approved_by": a.get("id"), "at": wt.isoformat()}
+                      for s, kd, b, a, wt in c.fetchall()]
+            c.execute("SELECT params, opened_by FROM decision_tickets "
+                      "WHERE verb IN ('delete','delete_node')")
+            marked = {(p.get("subject") or p.get("node_id")): ob.get("id")
+                      for p, ob in c.fetchall()}
+        for st in stones:
+            st["marked_by"] = marked.get(st["subject"])
+        return stones
+
     def leaderboard(self, token, k=20):
         """Karma + reputation + lifetime contribution counts — the user
         database's public face (everything public, user ruling 2026-08-09)."""

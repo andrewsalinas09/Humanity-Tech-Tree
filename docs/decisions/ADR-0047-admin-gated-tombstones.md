@@ -12,6 +12,7 @@ The log is append-only and nothing is ever deleted (ADR-0011); duplicates heal b
 2. **Marking is open; approving is admin-only.** `request_deletion(subject_id, reason)` — anyone authenticated, node or edge, reason required — opens a `delete` Decision ticket. Only a user with `is_admin` may resolve it; approval writes the tombstone fact under the admin's identity (blame assigned, ADR-0042). ADR-0015 is why the gate exists: a wrong tombstone hides truth, so the failure mode is centralized in accountable hands.
 3. **Tombstone ≠ shadow ≠ retract.** Retract targets assertions (claims); shadow keeps a superseded edge rendered as history; tombstone removes from the live view entirely. Three tools, three intents.
 4. Projections (`node_identities`/`edge_identities`) drop tombstoned rows; `rebuild_projections` replays to the same state.
+5. **Deletion records are PUBLIC — just not on the main page** (user ruling, same day): tombstones never render on the map, but a public record surface lists every one — what was removed, who marked it, who approved it, the reason, and when — served from the log + ticket trail. Removal is never silent.
 
 ## Consequences
 - TB-070 → Solved; Q-23 → Resolved. The us2524035 husk was removed by the first real ticket through this flow (agent requested; the agent's own approval was rejected ADMIN; andrew approved).
