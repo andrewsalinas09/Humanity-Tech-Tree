@@ -58,11 +58,13 @@ def build_app(pinned=None):
     @app.tool()
     def propose_node(name: str, ctx: Context, category: str = "TECHNOLOGY",
                      validity: str = "current_truth", search_receipt: int = None,
-                     node_id: str = None) -> dict:
-        """Create a node (requires a search_similar receipt; near-dupes open a ticket)."""
+                     node_id: str = None, description: str = None) -> dict:
+        """Create a node (requires a search_similar receipt; near-dupes open a
+        ticket). Include a 2-3 sentence description — what it is and why it
+        matters; it powers learning AND future semantic search."""
         tok = _cred(ctx, pinned)
-        return svc.propose_node(tok, name, category, validity,
-                                search_receipt, None, node_id) if tok else _NO_CRED
+        return svc.propose_node(tok, name, category, validity, search_receipt,
+                                None, node_id, description) if tok else _NO_CRED
 
     @app.tool()
     def verb(name: str, params: dict, ctx: Context) -> dict:

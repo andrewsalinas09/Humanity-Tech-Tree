@@ -7,10 +7,20 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 const TILER = process.env.NEXT_PUBLIC_TILER ?? "http://localhost:8748";
 
+type EdgeView = {
+  edge_id: string; other: string; other_name: string; type: string;
+  qualifier: string; year?: number; justification?: string;
+  shadowed: boolean; alt_group?: number | null;
+};
 type Card = {
-  name: string; validity: string; cited: boolean; image_url?: string;
-  requires_count: number; requires: any[];
-  enables_count: number; enables: any[]; missing?: string;
+  name: string; category: string; description?: string;
+  aliases: string[]; validity: string; cited: boolean;
+  citations: { claim: string; source: string; source_name: string;
+               locator?: string }[];
+  image_url?: string;
+  requires_count: number; requires: EdgeView[]; or_group_count: number;
+  enables_count: number; enables: EdgeView[];
+  story: EdgeView[]; missing?: string;
   versions?: { node_id: string; year: number }[];
 };
 type Solve = { existence: string; fitness: string; gaps: [string, string][] };
@@ -195,16 +205,59 @@ export default function Home() {
   };
 
   const S = styles;
-  const NeighborList = ({ title, items, total, dir }:
-    { title: string; items: any[]; total: number; dir: "from" | "to" }) => (
+  const qualifierWords: Record<string, string> = {
+    authored: "authored by", documents: "documented in",
+    invented: "invented by", discovered: "discovered by",
+    replaced: "replaced by",
+  };
+  const EdgeLine = ({ e }: { e: EdgeView }) => (
+    <li style={{ ...S.link, opacity: e.shadowed ? 0.5 : 1 }}
+        onClick={() => mapRef.current && focusOn(mapRef.current, e.other)}
+        title={e.justification ?? undefined}>
+      {e.other_name}
+      <small style={{ opacity: 0.5 }}>
+        {" "}{e.qualifier
+          ? (qualifierWords[e.qualifier] ?? e.qualifier)
+          : e.type.toLowerCase().replace(/_/g, " ")}
+        {e.year ? ` · ${Math.trunc(e.year)}` : ""}
+        {e.shadowed ? " · shadowed" : ""}
+      </small>
+    </li>
+  );
+  const RequiresList = ({ items, total }:
+    { items: EdgeView[]; total: number }) => {
+    const always = items.filter((e) => e.alt_group == null);
+    const groups = new Map<number, EdgeView[]>();
+    for (const e of items)
+      if (e.alt_group != null)
+        groups.set(e.alt_group, [...(groups.get(e.alt_group) ?? []), e]);
+    return (
+      <div>
+        <h4 style={{ margin: "14px 0 4px" }}>requires ({total})</h4>
+        <ul style={{ margin: 0 }}>{always.map((e) =>
+          <EdgeLine key={e.edge_id} e={e} />)}</ul>
+        {groups.size > 0 && (
+          <div style={S.orBox}>
+            <div style={S.orTitle}>either path:</div>
+            {[...groups.entries()].map(([gi, ge], idx) => (
+              <div key={gi}>
+                {idx > 0 && <div style={S.orSep}>— or —</div>}
+                <ul style={{ margin: 0 }}>{ge.map((e) =>
+                  <EdgeLine key={e.edge_id} e={e} />)}</ul>
+              </div>))}
+          </div>)}
+        {total > items.length &&
+          <div style={{ opacity: 0.5, fontSize: 12, marginTop: 2 }}>
+            +{total - items.length} more — explore on the map</div>}
+      </div>
+    );
+  };
+  const NeighborList = ({ title, items, total }:
+    { title: string; items: EdgeView[]; total: number }) => (
     <div>
       <h4 style={{ margin: "14px 0 4px" }}>{title} ({total})</h4>
       <ul style={{ margin: 0 }}>
-        {items.map((e) => (
-          <li key={e.edge_id} style={S.link}
-              onClick={() => mapRef.current && focusOn(mapRef.current, e[dir])}>
-            {e[dir]} <small style={{ opacity: 0.45 }}>{e.type}</small>
-          </li>))}
+        {items.map((e) => <EdgeLine key={e.edge_id} e={e} />)}
       </ul>
       {total > items.length &&
         <div style={{ opacity: 0.5, fontSize: 12, marginTop: 2 }}>
@@ -233,12 +286,31 @@ export default function Home() {
             <div>
               {card.image_url &&
                 <img src={card.image_url} alt="" style={S.img} />}
-              <h2 style={{ margin: "4px 0 10px" }}>{card.name}</h2>
-              <p>
+              <h2 style={{ margin: "4px 0 4px" }}>{card.name}</h2>
+              {card.aliases.length > 0 &&
+                <div style={{ opacity: 0.55, fontSize: 12, marginBottom: 6 }}>
+                  also: {card.aliases.join(" · ")}</div>}
+              <p style={{ margin: "4px 0 8px" }}>
+                <Chip ok label={card.category.toLowerCase().replace(/_/g, " ")} />{" "}
                 <Chip ok={card.validity === "current_truth"}
                       label={`validity: ${card.validity}`} />{" "}
                 <Chip ok={card.cited} label={card.cited ? "cited" : "needs citation"} />
               </p>
+              {card.description
+                ? <p style={S.desc}>{card.description}</p>
+                : <p style={{ ...S.desc, opacity: 0.45, fontStyle: "italic" }}>
+                    No description yet — this node needs one.</p>}
+              {card.citations.length > 0 && (
+                <div style={{ fontSize: 12, margin: "6px 0" }}>
+                  {card.citations.map((c, i) => (
+                    <div key={i} style={{ opacity: 0.7 }}>
+                      📖 <span style={S.link}
+                            onClick={() => mapRef.current &&
+                                           focusOn(mapRef.current, c.source)}>
+                        {c.source_name}</span>
+                      {c.locator ? ` — ${c.locator}` : ""}
+                    </div>))}
+                </div>)}
               {!solve &&
                 <button onClick={askSolve} disabled={solving} style={S.solveBtn}>
                   {solving ? "solving…" : "Can this be built? (ask the solver)"}
@@ -280,10 +352,12 @@ export default function Home() {
                         </li>))}
                     </ul>)}
                 </div>)}
-              <NeighborList title="requires" items={card.requires}
-                            total={card.requires_count} dir="from" />
+              <RequiresList items={card.requires} total={card.requires_count} />
               <NeighborList title="enables" items={card.enables}
-                            total={card.enables_count} dir="to" />
+                            total={card.enables_count} />
+              {card.story.length > 0 &&
+                <NeighborList title="story & sources" items={card.story}
+                              total={card.story.length} />}
             </div>
           )}
         </aside>
@@ -325,6 +399,14 @@ const styles: Record<string, React.CSSProperties> = {
          border: "1px solid #e4e8ef" },
   solveBtn: { padding: "8px 12px", borderRadius: 10, border: "1px solid #cfd6e0",
               background: "#f6f8fb", cursor: "pointer", fontSize: 13 },
+  desc: { fontSize: 13.5, lineHeight: 1.5, color: "#2a3242",
+          margin: "6px 0 10px" },
+  orBox: { border: "1px dashed #cfd6e0", borderRadius: 10,
+           padding: "6px 10px", margin: "8px 0" },
+  orTitle: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6,
+             color: "#8a93a3", marginBottom: 4 },
+  orSep: { textAlign: "center", fontSize: 11, color: "#b0b8c6",
+           margin: "2px 0" },
   solveBox: { padding: "10px 12px", borderRadius: 10, background: "#f6f8fb",
               border: "1px solid #e4e8ef", margin: "6px 0" },
   search: { position: "absolute", top: 12, right: 12, zIndex: 5 },

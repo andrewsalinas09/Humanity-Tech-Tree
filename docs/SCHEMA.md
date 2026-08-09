@@ -27,6 +27,7 @@ The store holds only **ground facts** — citable observations, appended forever
 | `inheritance_overrides` | InheritanceOverride[] {family_edge_id, WIDEN_TO_LCA\|EXCLUDE, relaxed_target?, justification} | ADR-0019; H7 re-validation; H17 multi-parent |
 | `iteration_records` | ProductIteration[] {name, year, key_feature, tech_ids?, exclusions?} | ADR-0009/0018; liftable (ADR-0018 §4, H6) |
 | `migrated_to` | node_id? | merge redirect (ADR-0011); acyclic (H4); reversible via Un-merge (H5) |
+| `description` | string (2–3 sentences) | what it is + why it matters (user ruling 2026-08-09). Optional but ENCOURAGED (build-from-zero: absence is visible, never blocking). Doubles as the embedding text for the Q-20 semantic existence gate — name alone is a terrible embedding |
 | `zoom_level`, `wiki_summary`, `image_url` | | display |
 
 **Removed by audit (ADR-0026):** `current_state`, `active_instance_count` — state is computed; the parentless magic-box-REALIZED default applies only when `validity = current_truth` (TB-041 false-unlock guard).

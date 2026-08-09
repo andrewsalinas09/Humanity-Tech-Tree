@@ -164,7 +164,8 @@ class Service:
     # -- writes ---------------------------------------------------------------
     def propose_node(self, token, name, category="TECHNOLOGY",
                      validity=None, search_receipt=None,
-                     duplicate_resolution=None, node_id=None):
+                     duplicate_resolution=None, node_id=None,
+                     description=None):
         """The gate is unskippable by construction: a receipt for a matching query
         is REQUIRED; exact matches force a Decision (use-existing vs create-anyway)."""
         identity, budget = self.authenticate(token)
@@ -197,6 +198,9 @@ class Service:
         nid = node_id or name.lower().replace(" ", "-")
         facts = [("node.create", {"node_id": nid, "category": category}),
                  ("assert", {"subject": nid, "field": "name", "value": name})]
+        if description:                            # encouraged, never required
+            facts.append(("assert", {"subject": nid, "field": "description",
+                                     "value": description}))
         if validity is not None:                   # blame corollary (ADR-0042):
             facts.append(("assert", {"subject": nid, "field": "validity",
                                      "value": validity}))

@@ -232,8 +232,35 @@ def tile(z: int, x: int, y: int):
     return Response(content=data, media_type="application/vnd.mapbox-vector-tile")
 
 
+def _flat_or(x):
+    """Top-level OR arms of a requirement expr (['or', a, b] nests left)."""
+    if isinstance(x, list) and x and x[0] == "or":
+        return _flat_or(x[1]) + _flat_or(x[2])
+    return [x]
+
+
+def _expr_leaves(x, out):
+    if isinstance(x, list):
+        if x and x[0] == "edge":
+            out.append(x[1])
+        else:
+            for y in x[1:]:
+                _expr_leaves(y, out)
+
+
+def _edge_view(view, e, other_key):
+    sd = view.field(e["edge_id"], "start_date") or {}
+    return {"edge_id": e["edge_id"], "from": e["from"], "to": e["to"],
+            "other": e[other_key],
+            "other_name": view.field(e[other_key], "name") or e[other_key],
+            "type": e["type"], "qualifier": e.get("qualifier") or "",
+            "year": sd.get("year"),
+            "justification": view.field(e["edge_id"], "justification"),
+            "shadowed": view.is_shadowed(e["edge_id"])}
+
+
 @app.get("/node/{node_id}")
-def node_card(node_id: str, k: int = 7):
+def node_card(node_id: str, k: int = 9):
     """The card is CHEAP (lazy principle): no solving here — realizability is a
     question you ask (/solve). Neighbor lists are capped (counts + top-k)."""
     st = _state()
@@ -241,15 +268,55 @@ def node_card(node_id: str, k: int = 7):
     n = view.node(node_id)
     if n is None:
         return {"missing": node_id}
-    ein, eout = view.edges_in(node_id), view.edges_out(node_id)
+    kinds = HARD | {"OPTIMIZES"}
+    ein = [e for e in view.edges_in(node_id, kinds)]
+    eout = [e for e in view.edges_out(node_id, kinds)]
+    story = ([_edge_view(view, e, "from") for e in view.edges_in(node_id)
+              if e["type"] in GHOST_TYPES]
+             + [_edge_view(view, e, "to") for e in view.edges_out(node_id)
+                if e["type"] in GHOST_TYPES])
+
+    # OR paths (ADR-0017): top-level alternatives of the requirement expr —
+    # the card must SHOW the logic, not flatten it into a lying AND-list
+    expr = view.field(node_id, "requirement_expr")
+    groups = []
+    if expr is not None:
+        arms = _flat_or(expr)
+        if len(arms) > 1:
+            for arm in arms:
+                leaves = []
+                _expr_leaves(arm, leaves)
+                groups.append([l for l in leaves if view.edge(l)])
+    grouped = {eid: gi for gi, g in enumerate(groups) for eid in g}
+
+    requires = [{**_edge_view(view, e, "from"),
+                 "alt_group": grouped.get(e["edge_id"])} for e in ein]
+
+    cites = []
+    for (subj, fldname), (aid, _v) in list(view._fields.items()):
+        if subj == node_id:
+            c = view.field(aid, "citation")
+            if c:
+                cites.append({"claim": fldname, "source": c.get("source"),
+                              "source_name": (view.field(c.get("source"), "name")
+                                              or c.get("source")),
+                              "locator": c.get("locator")})
+
     return {
         "node": n,
         "name": view.field(node_id, "name") or node_id,
+        "category": n.get("category", "TECHNOLOGY"),
+        "description": view.field(node_id, "description"),
+        "aliases": view.field(node_id, "aliases", []) or [],
         "validity": view.field(node_id, "validity") or "unassessed",
         "cited": _cited(view, node_id),
+        "citations": cites,
         "image_url": view.field(node_id, "image_url"),
-        "requires_count": len(ein), "requires": ein[:k],
-        "enables_count": len(eout), "enables": eout[:k],
+        "requires_count": len(ein), "requires": requires[:k],
+        "or_group_count": len(groups),
+        "enables_count": len(eout),
+        "enables": [_edge_view(view, e, "to") for e in eout[:k]],
+        "story": story[:k],
         "versions": sorted(
             [{"node_id": v, "year": y} for v, (f, y) in st["vmap"].items()
              if f == node_id], key=lambda r: r["year"]),
@@ -364,7 +431,16 @@ def style():
              "source-layer": "edges",
              "filter": ["all", ["get", "ghost"], SHOW_EDGE],
              "layout": {"line-cap": "round"},
-             "paint": {"line-color": "#a99cc0", "line-width": 1.2,
+             # qualifier promotion (user ruling 2026-08-09): authorship /
+             # original-work threads get their own sepia voice — storage
+             # stays ASSOCIATION+qualifier (the §3.1 escape hatch, visually)
+             "paint": {"line-color": ["match", ["get", "qualifier"],
+                                      ["authored", "documents", "invented",
+                                       "discovered"], "#b07c3a",
+                                      "#a99cc0"],
+                       "line-width": ["match", ["get", "qualifier"],
+                                      ["authored", "documents", "invented",
+                                       "discovered"], 1.5, 1.2],
                        "line-opacity": _edge_state(0.75, 0.15, 0.32),
                        "line-dasharray": ["literal", [1, 3]]}},
             {"id": "edges-casing", "type": "line", "source": "httk",
