@@ -1,0 +1,282 @@
+"""Verb compilers (ADR-0040, docs/VERBS.md): deterministic (view, params) ->
+StagedFacts | Decision | Rejection. The LLM is never in here — Decisions carry
+the complete legal option set; callers only choose.
+"""
+from dataclasses import dataclass, field
+
+from .store import Store, View
+
+PEOPLE_ORGS = {"BIOLOGICAL_ENTITY", "ORGANIZATION"}
+KNOWLEDGE = {"NATURAL_LAW", "FORMAL_CONCEPT", "METHOD_TECHNIQUE", "WORK_PUBLICATION"}
+
+
+@dataclass
+class StagedFacts:
+    facts: list                      # [(kind, body)]
+    notes: list = field(default_factory=list)   # linter warns (advisory, L*)
+
+    def apply(self, store: Store):
+        for kind, body in self.facts:
+            if kind == "node.create":
+                store.append("node.create", body)
+            elif kind == "edge.create":
+                store.append("edge.create", body)
+            elif kind == "assert":
+                store.assert_field(body["subject"], body["field"], body["value"])
+            elif kind == "retract":
+                store.retract(body["target"])
+        return self
+
+
+@dataclass
+class Decision:
+    verb: str
+    reason: str
+    options: list                    # [{key, ...evidence}] — the COMPLETE legal set
+    evidence: dict = field(default_factory=dict)
+
+
+@dataclass
+class Rejection:
+    rule: str
+    message: str
+
+
+# ---------------------------------------------------------------- helpers ----
+
+def _ancestors(view, node_id, _seen=None):
+    _seen = _seen or set()
+    out = set()
+    for p in view.taxonomy_parents(node_id):
+        if p not in _seen:
+            _seen.add(p)
+            out.add(p)
+            out |= _ancestors(view, p, _seen)
+    return out
+
+
+def _shares_ancestor(view, a, b):
+    return bool((_ancestors(view, a) | {a}) & (_ancestors(view, b) | {b}))
+
+
+def _add_or_alternative(view, consumer, new_edge, role):
+    """The L11 trigger: same-type edge into consumer whose provider shares a
+    taxonomy ancestor with the new provider ⇒ role REQUIRED."""
+    siblings = [e for e in view.edges_in(consumer, {new_edge["type"]})
+                if not view.is_shadowed(e["edge_id"])
+                and _shares_ancestor(view, e["from"], new_edge["from"])]
+    if siblings and role is None:
+        return Decision(
+            "add_*", "same-role candidates exist: additional or alternative? (L11)",
+            options=[{"key": "additional"},
+                     *({"key": "alternative", "to": e["edge_id"]} for e in siblings)],
+            evidence={"siblings": [e["edge_id"] for e in siblings]})
+    facts = [("edge.create", new_edge)]
+    if isinstance(role, dict) and role.get("alternative"):
+        other = role["alternative"]
+        expr = view.field(consumer, "requirement_expr")
+        if expr is None:
+            expr = ["or", ["edge", other], ["edge", new_edge["edge_id"]]]
+        else:
+            expr = ["or", expr, ["edge", new_edge["edge_id"]]]
+        facts.append(("assert", {"subject": consumer, "field": "requirement_expr",
+                                 "value": expr}))
+    return StagedFacts(facts)
+
+
+def _cat(view, node_id):
+    n = view.node(node_id)
+    return n["category"] if n else None
+
+
+# ------------------------------------------------------- role-named verbs ----
+
+def add_component(view, whole, part, role=None, edge_id=None):
+    if _cat(view, part) in PEOPLE_ORGS:
+        return Rejection("L5", f"{part} is a person/org — people are never parts")
+    e = {"edge_id": edge_id or f"e_{part}_{whole}", "from": part, "to": whole,
+         "type": "IS_COMPONENT_OF", "qualifier": None}
+    return _add_or_alternative(view, whole, e, role)
+
+
+def add_ingredient(view, product, ingredient, role=None, edge_id=None):
+    if _cat(view, ingredient) in PEOPLE_ORGS:
+        return Rejection("L5", f"{ingredient} is a person/org — never an ingredient")
+    e = {"edge_id": edge_id or f"e_{ingredient}_{product}", "from": ingredient,
+         "to": product, "type": "IS_INGREDIENT_OF", "qualifier": None}
+    return _add_or_alternative(view, product, e, role)
+
+
+def add_enabler(view, enabled, enabler, justification=None, edge_id=None):
+    notes = []
+    if _cat(view, enabler) == "WORK_PUBLICATION" and _cat(view, enabled) not in PEOPLE_ORGS:
+        notes.append("L1: depend on the concept the work codifies, not the paper")
+    if _cat(view, enabled) == "BIOLOGICAL_ENTITY" and _cat(view, enabler) not in KNOWLEDGE:
+        return Rejection("L2", "people receive only knowledge ENABLES")
+    if _cat(view, enabler) == "BIOLOGICAL_ENTITY":
+        if not justification:
+            return Rejection("L3", "direct person link: justification required "
+                                   "(substitutability default is 99.9% no)")
+        notes.append("L3: direct person link — review-flagged")
+    e = {"edge_id": edge_id or f"e_{enabler}_{enabled}", "from": enabler,
+         "to": enabled, "type": "ENABLES", "qualifier": None}
+    return StagedFacts([("edge.create", e)], notes)
+
+
+def classify(view, instance, type_, edge_id=None):
+    if type_ in (_ancestors(view, instance) | {instance}):
+        pass  # re-classification idempotent-ish; DAG check below is the guard
+    if instance in _ancestors(view, type_) or instance == type_:
+        return Rejection("B1", "classification would create a taxonomy cycle")
+    e = {"edge_id": edge_id or f"t_{instance}_{type_}", "from": instance,
+         "to": type_, "type": "IS_TYPE_OF", "qualifier": None}
+    notes = []
+    ci, ct = _cat(view, instance), _cat(view, type_)
+    if ci and ct and ci != ct:
+        notes.append("L4: cross-category IS_TYPE_OF — review lane (Q-14)")
+    return StagedFacts([("edge.create", e)], notes)
+
+
+# ------------------------------------------------------------- intercept -----
+
+LEGAL_LEG_TYPES = {"IS_COMPONENT_OF", "IS_INGREDIENT_OF", "ENABLES"}
+
+
+def intercept(view, edge_id, via, first_leg_type=None, second_leg_type=None):
+    """TB-068 compiler: two edges + shadow (never archive). Leg types are a
+    Decision if omitted; constraints trigger the TB-067 relocation Decision."""
+    edge = view.edge(edge_id)
+    if edge is None:
+        return Rejection("E404", f"edge {edge_id} unknown")
+    if first_leg_type is None or second_leg_type is None:
+        combos = [{"key": f"{a}+{b}", "first": a, "second": b}
+                  for a in LEGAL_LEG_TYPES for b in LEGAL_LEG_TYPES
+                  if edge["type"] in (a, b) or edge["type"] == "ENABLES"]
+        return Decision("intercept", "choose leg types (only legal pairs offered)",
+                        options=combos, evidence={"original_type": edge["type"]})
+    e1 = {"edge_id": f"{edge_id}_a", "from": edge["from"], "to": via,
+          "type": first_leg_type, "qualifier": None}
+    e2 = {"edge_id": f"{edge_id}_b", "from": via, "to": edge["to"],
+          "type": second_leg_type, "qualifier": None}
+    staged = StagedFacts([
+        ("edge.create", e1), ("edge.create", e2),
+        ("assert", {"subject": edge_id, "field": "shadowed_by",
+                    "value": [e1["edge_id"], e2["edge_id"]]}),
+    ])
+    if view.field(edge_id, "constraints"):
+        staged.notes.append("TB-067 decision pending: constraints stay enforced "
+                            "through the chain; relocation options: "
+                            f"[stay, {e1['edge_id']}, {e2['edge_id']}]")
+    return staged
+
+
+# ------------------------------------------------- exclude / widen (ADR-0019)
+
+def exclude(view, instance, family_edge, justification):
+    edge = view.edge(family_edge)
+    if edge is None:
+        return Rejection("E404", f"edge {family_edge} unknown")
+    if edge["to"] not in _ancestors(view, instance):
+        return Rejection("ADR-0019", f"{family_edge} is not inherited by {instance}")
+    ex = list(view.field(instance, "excludes", []) or [])
+    if family_edge not in ex:
+        ex.append(family_edge)
+    return StagedFacts([("assert", {"subject": instance, "field": "excludes",
+                                    "value": ex})],
+                       [f"exclusion justified: {justification}"])
+
+
+def widen(view, instance, family_edge, provider, to_ancestor=None, justification=""):
+    """Legal targets = common ancestors of (original target, exceptional provider)."""
+    edge = view.edge(family_edge)
+    if edge is None:
+        return Rejection("E404", f"edge {family_edge} unknown")
+    common = sorted((_ancestors(view, edge["from"]) | {edge["from"]})
+                    & (_ancestors(view, provider) | {provider}))
+    if not common:
+        return Rejection("H17", "no common ancestor — widening cannot express this; "
+                                "the exceptional provider is a different kind entirely")
+    if to_ancestor is None:
+        if len(common) == 1:
+            to_ancestor = common[0]
+        else:
+            return Decision("widen", "several common ancestors — all truth-preserving; "
+                                     "choice is editorial (H17/Q-14)",
+                            options=[{"key": c} for c in common])
+    if to_ancestor not in common:
+        return Rejection("H17", f"{to_ancestor} is not a common ancestor {common}")
+    ov = list(view.field(instance, "widenings", []) or [])
+    ov.append({"family_edge": family_edge, "relaxed_to": to_ancestor,
+               "justification": justification})
+    return StagedFacts([("assert", {"subject": instance, "field": "widenings",
+                                    "value": ov})])
+
+
+# ---------------------------------------------------------- merge / unmerge --
+
+def merge(view, src, dst, justification=""):
+    seen, cur = set(), dst
+    while cur:
+        if cur == src or cur in seen:
+            return Rejection("B4", f"redirect {src}->{dst} closes a cycle")
+        seen.add(cur)
+        cur = view.field(cur, "migrated_to")
+    aliases = sorted(set((view.field(src, "aliases", []) or [])
+                         + (view.field(dst, "aliases", []) or [])
+                         + [src]))
+    return StagedFacts([
+        ("assert", {"subject": src, "field": "migrated_to", "value": dst}),
+        ("assert", {"subject": dst, "field": "aliases", "value": aliases}),
+    ], [f"merge justified: {justification}"])
+
+
+def unmerge(store, view, node, justification=""):
+    """H5: forward-edit reopen + computed triage. Pre-merge assertion homes are
+    COMPUTED (H5a) — only post-merge assertions become Decisions."""
+    merge_seq = None
+    for f in store.facts:
+        b = f["body"]
+        if (f["kind"] == "assert" and b.get("subject") == node
+                and b.get("field") == "migrated_to" and b.get("value")):
+            merge_seq = f["recorded_at"]
+            target = b["value"]
+    if merge_seq is None:
+        return Rejection("H5", f"{node} is not merged")
+    MERGE_BOOKKEEPING = {"aliases", "name_history"}   # mechanical unions (H6), not content
+    post = [f["fact_id"] for f in store.facts
+            if f["recorded_at"] > merge_seq and f["kind"] == "assert"
+            and f["body"].get("subject") == target
+            and f["body"].get("field") not in MERGE_BOOKKEEPING]
+    staged = StagedFacts([("assert", {"subject": node, "field": "migrated_to",
+                                      "value": None})],
+                         [f"unmerge justified: {justification}"])
+    triage = [Decision("unmerge", f"post-merge assertion {fid}: keep/move/park",
+                       options=[{"key": "keep"}, {"key": "move", "to": node},
+                                {"key": "park"}])
+              for fid in post]
+    return staged, triage
+
+
+# ----------------------------------------------------------- evidence verbs --
+
+def attach_citation(view, assertion_id, source_node, locator=None):
+    return StagedFacts([("assert", {"subject": assertion_id, "field": "citation",
+                                    "value": {"source": source_node,
+                                              "locator": locator}})])
+
+
+def correct(view, subject, fld, new_value, justification=""):
+    """Supersession under the SAME identity (ADR-0038): metadata polish only."""
+    return StagedFacts([("assert", {"subject": subject, "field": fld,
+                                    "value": new_value})],
+                       [f"correction: {justification}"])
+
+
+def set_constraint(view, edge_id, attr, op, value, class_="FITNESS", citation=None):
+    if class_ == "PHYSICAL" and not citation:
+        return Rejection("L13", "PHYSICAL constraint requires a citation — "
+                                "impossibility carries the burden of proof (ADR-0039)")
+    cons = list(view.field(edge_id, "constraints", []) or [])
+    cons.append({"attr": attr, "op": op, "value": value, "class": class_})
+    return StagedFacts([("assert", {"subject": edge_id, "field": "constraints",
+                                    "value": cons})])
