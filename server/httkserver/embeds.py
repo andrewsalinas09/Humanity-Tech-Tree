@@ -46,6 +46,10 @@ def _embed(texts):
 
 
 def _node_text(view, n):
+    """Name + aliases + category + description + NEIGHBORHOOD (user ruling
+    2026-08-09: 'its parents and children + their edges make this nearly
+    trivial') — the graph context rides into the vector, so 'who plausibly
+    consumes electricity' becomes a similarity query."""
     parts = [view.field(n, "name") or n]
     parts += [str(a) for a in (view.field(n, "aliases", []) or [])]
     nd = view.node(n) or {}
@@ -53,6 +57,31 @@ def _node_text(view, n):
     desc = view.field(n, "description")
     if desc:
         parts.append(desc)
+
+    def name_of(x):
+        return view.field(x, "name") or x
+
+    REL = {"ENABLES": "enabled by", "IS_COMPONENT_OF": "contains",
+           "IS_INGREDIENT_OF": "made with", "IS_TYPE_OF": "instance",
+           "IS_REFINEMENT_OF": "version", "OPTIMIZES": "refined by"}
+    parents = [name_of(e["to"]) for e in view.edges_out(n, {"IS_TYPE_OF"})]
+    if parents:
+        parts.append("type of: " + ", ".join(sorted(parents)[:4]))
+    kids = [name_of(e["from"]) for e in view.edges_in(n, {"IS_TYPE_OF",
+                                                          "IS_REFINEMENT_OF"})]
+    if kids:
+        parts.append("kinds: " + ", ".join(sorted(kids)[:6]))
+    rels = []
+    for e in view.edges_in(n):
+        w = REL.get(e["type"])
+        if w and not view.is_shadowed(e["edge_id"]):
+            rels.append(f"{w} {name_of(e['from'])}")
+    for e in view.edges_out(n):
+        if e["type"] in ("ENABLES", "IS_COMPONENT_OF", "IS_INGREDIENT_OF") \
+                and not view.is_shadowed(e["edge_id"]):
+            rels.append(f"used in {name_of(e['to'])}")
+    if rels:
+        parts.append("; ".join(sorted(rels)[:10]))
     return " — ".join(p for p in parts if p)
 
 
