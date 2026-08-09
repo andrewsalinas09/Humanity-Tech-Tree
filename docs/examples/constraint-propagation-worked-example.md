@@ -65,6 +65,29 @@ Misplaced *values* need no special rule: a transistor node claiming `power_draw 
 - Shadowed original edge (Transistor→CPU direct, from the Intercept) is exempt from implicit-AND and satisfied by the chain (H12) — the interposition that created this situation never breaks the expression.
 - Full evaluation semantics are Phase 4 (SCHEMA §13.7); the *data* — constraints on edges, attributes on nodes, expressions on consumers — is all captured in v1 now, which is what makes the solver a pure adder later.
 
+## The full trace (what the God-Mode tracer prints)
+
+```text
+SOLVE buildable?(iPhone) @ (2026, global)
+├─ iPhone.requirement_expr: absent → implicit AND of hard edges
+├─ [e_ip] needs CPU · {power_draw < 3W, volume < 10cm³}
+│   └─ SOLVE CPU
+│      ├─ CPU (abstract role) declares nothing → package check deferred to candidates
+│      ├─ [e_lg] needs Logic Gate · {power_per_gate < 1mW, switching_speed > 100MHz}
+│      │        ← CPU's AUTHORED translation (chain of responsibility; Q-08 expertise)
+│      │   └─ SOLVE Logic Gate: OR(e_transistor, e_vacuum)
+│      │      ├─ e_vacuum: power_per_gate ≈ 2W  ✗ < 1mW (certain violation, H2)
+│      │      │   ✂ PRUNED — this query only                     [renders red]
+│      │      ├─ e_transistor: 100nW ✓, 1GHz ✓
+│      │      │   └─ needs Silicon · purity ≥ 99.9999%
+│      │      │       → base 99% + Zone-Refining OPTIMIZES modifier stack ✓
+│      │      └─ OR satisfied via transistor
+│      └─ candidate CPUs (A18: declared power_draw 2.5W ✓, volume ✓) → e_ip satisfied
+└─ VERDICT: BUILDABLE — green: iPhone→CPU→LogicGate→Transistor→Silicon; pruned: tubes @ e_lg
+```
+
+Honesty notes: the package→per-gate translation is *authored* edge content, never computed; the tube kill compares *declared* values (undeclared would pass presumed-satisfiable per TB-066 — and the absurd green trace becomes the bounty that gets the attribute declared); "riding up" in v1 means checks fire against declared values at each seam (A18's cited 2.5W satisfies the 3W demand) — never gate-count arithmetic (Q-10 deferred); and `buildable?(CPU) @ 1946` passes the tube branch — same graph, opposite selection, both true.
+
 ## The takeaway sentence
 
 Demand flows down and translates; attributes flow up and compose; branches die per-query at whichever seam the numbers (or the topology) collide — and the losing branch is never wrong, only unfit for this consumer's purpose, exactly like real engineering.
