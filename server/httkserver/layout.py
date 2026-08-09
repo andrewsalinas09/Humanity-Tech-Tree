@@ -7,8 +7,35 @@ Positions are DERIVED data (ADR-0026) — rebuildable, never truth.
 """
 from httk.store import HARD_TYPES, TAXONOMY_TYPES
 
+import math
+
 LAT_MIN, LAT_MAX = -60.0, 60.0
 LNG_MIN, LNG_MAX = -179.0, 179.0
+
+
+def importance(view):
+    """The airport-map metric (user ruling): hubs vs leaves. Importance =
+    degree + transitive dependency mass (the BLAST RADIUS of ADR-0013, live),
+    log-normalized to 0..1. Computed, never stored (ADR-0026)."""
+    nodes = view.nodes()
+    kinds = HARD_TYPES | TAXONOMY_TYPES
+    deg = {n: len(view.edges_in(n, kinds)) + len(view.edges_out(n, kinds))
+           for n in nodes}
+    mass = {}
+    for n in nodes:                       # downstream consumers, transitively
+        seen, frontier = set(), {n}
+        while frontier:
+            nxt = set()
+            for m in frontier:
+                for e in view.edges_out(m, HARD_TYPES):
+                    if e["to"] not in seen:
+                        seen.add(e["to"])
+                        nxt.add(e["to"])
+            frontier = nxt
+        mass[n] = len(seen)
+    raw = {n: deg[n] + 2 * mass[n] for n in nodes}
+    mx = max(raw.values(), default=1) or 1
+    return {n: math.log1p(raw[n]) / math.log1p(mx) for n in nodes}
 
 
 def layered_layout(view):
@@ -59,35 +86,37 @@ def layered_layout(view):
             lat = LAT_MAX if max_layer == 0 else (
                 LAT_MAX - (LAT_MAX - LAT_MIN) * ly / max_layer)
             pos[n] = (max(LNG_MIN, min(LNG_MAX, lng)), lat, ly)
-    return _relax(pos, edge_pairs)
+    return _relax(pos, edge_pairs, importance(view))
 
 
-def _relax(pos, edges, iters=260):
-    """Organic settling (user ruling: 'nodes automatically move out of the way').
-    Deterministic force relaxation: pairwise repulsion + edge springs + a soft
-    anchor to each node's altitude band, so the up/down MEANING survives while
-    the rigidity dies. O(n²) per step — fine at dev scale; spatial hashing when
-    corridors multiply."""
+def _relax(pos, edges, imp, iters=260):
+    """Airport-map settling (user rulings): bodies move out of the way, HUBS
+    CARVE TERRITORY (repulsion scales with importance product), LEAVES HUG
+    their hub (spring rest length shrinks for low-importance endpoints), and a
+    soft altitude anchor keeps the up/down meaning. Deterministic; O(n²) —
+    spatial hashing when corridors multiply."""
     ids = sorted(pos)
     P = {n: [pos[n][0], pos[n][1]] for n in ids}
     anchor = {n: pos[n][1] for n in ids}
+    w = {n: 0.35 + imp.get(n, 0.0) for n in ids}         # body mass 0.35..1.35
     for it in range(iters):
         F = {n: [0.0, 0.0] for n in ids}
-        for i, a in enumerate(ids):                      # repulsion (bodies!)
+        for i, a in enumerate(ids):                      # repulsion: hubs push
             for b in ids[i + 1:]:
                 dx, dy = P[a][0] - P[b][0], P[a][1] - P[b][1]
                 d2 = dx * dx + dy * dy + 0.01
-                if d2 < 625:                             # only near neighbors
+                if d2 < 900:
                     d = d2 ** 0.5
-                    f = 90.0 / d2
+                    f = 120.0 * w[a] * w[b] / d2
                     F[a][0] += f * dx / d; F[a][1] += f * dy / d
                     F[b][0] -= f * dx / d; F[b][1] -= f * dy / d
-        for u, v in edges:                               # springs (kinship)
+        for u, v in edges:                               # springs: leaves hug
             if u not in P or v not in P:
                 continue
             dx, dy = P[v][0] - P[u][0], P[v][1] - P[u][1]
             d = (dx * dx + dy * dy) ** 0.5 + 1e-6
-            f = 0.018 * (d - 13.0)
+            rest = 6.0 + 11.0 * (imp.get(u, 0) + imp.get(v, 0))
+            f = 0.02 * (d - rest)
             F[u][0] += f * dx / d; F[u][1] += f * dy / d
             F[v][0] -= f * dx / d; F[v][1] -= f * dy / d
         for n in ids:                                    # altitude still means

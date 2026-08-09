@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from httk import Store, View, realizable
 from httkdb.factlog import PgFactLog
-from httkserver.layout import layered_layout
+from httkserver.layout import layered_layout, importance
 
 EXTENT = 4096
 BUF = 256                     # tile buffer: geometry clipped server-side (px)
@@ -114,7 +114,8 @@ def _state():
     if seq != _cache["seq"]:
         store = Store.load(pg.export_jsonl())
         view = View(store)
-        _cache.update(seq=seq, store=store, view=view, pos=layered_layout(view))
+        _cache.update(seq=seq, store=store, view=view,
+                      pos=layered_layout(view), imp=importance(view))
     return _cache
 
 
@@ -163,6 +164,7 @@ def tile(z: int, x: int, y: int):
                 "validity": view.field(n, "validity") or "unassessed",
                 "cited": _cited(view, n),
                 "layer": layer,
+                "rank": round(st["imp"].get(n, 0.0), 3),   # hub..leaf (airport map)
             },
         })
     for e in view._edges.values():
@@ -180,7 +182,9 @@ def tile(z: int, x: int, y: int):
                 "properties": {"edge_id": e["edge_id"], "type": e["type"],
                                "qualifier": e.get("qualifier") or "",
                                "ghost": e["type"] in GHOST_TYPES,
-                               "shadowed": view.is_shadowed(e["edge_id"])},
+                               "shadowed": view.is_shadowed(e["edge_id"]),
+                               "rank": round(min(st["imp"].get(e["from"], 0),
+                                                 st["imp"].get(e["to"], 0)), 3)},
             })
     data = mapbox_vector_tile.encode([
         {"name": "edges", "features": edges_feats},
@@ -295,21 +299,29 @@ def style():
              "layout": {"line-cap": "round", "line-join": "round"},
              "paint": {"line-color": ["case", ["get", "shadowed"], "#c3ccd8",
                                       "#8aa8cf"],
-                       "line-width": ["interpolate", ["linear"], ["zoom"],
-                                      2, 1.2, 8, 2.4],
-                       "line-opacity": [*DIM, 0.25, 0.8],
+                       "line-width": ["+",                     # trunk routes thicker
+                                      ["interpolate", ["linear"], ["zoom"],
+                                       2, 0.8, 8, 1.6],
+                                      ["*", 2.4, ["get", "rank"]]],
+                       "line-opacity": [*DIM, 0.25,
+                                        ["+", 0.45, ["*", 0.4, ["get", "rank"]]]],
                        "line-dasharray": ["case", ["get", "shadowed"],
                                           ["literal", [2, 2]], ["literal", [1, 0]]]}},
             {"id": "node-ring", "type": "symbol", "source": "httk",
              "source-layer": "nodes", "filter": ["!", ["get", "cited"]],
-             "layout": {"icon-image": "book-ring", "icon-size": 1.0,
-                        "icon-allow-overlap": True},
+             "layout": {"icon-image": "book-ring",
+                        "icon-size": ["+", 0.6, ["*", 0.9, ["get", "rank"]]],
+                        "icon-allow-overlap": True,
+                        "symbol-sort-key": ["-", 1, ["get", "rank"]]},
              "paint": {"icon-opacity": [*DIM, 0.3, 1.0]}},
             {"id": "nodes", "type": "symbol", "source": "httk",
              "source-layer": "nodes",
-             "layout": {"icon-image": "book", "icon-size": 1.0,
+             "layout": {"icon-image": "book",
+                        "icon-size": ["+", 0.6, ["*", 0.9, ["get", "rank"]]],
                         "icon-allow-overlap": True,
-                        "text-field": ["get", "name"], "text-size": 12,
+                        "symbol-sort-key": ["-", 1, ["get", "rank"]],
+                        "text-field": ["get", "name"],
+                        "text-size": ["+", 10, ["*", 6, ["get", "rank"]]],
                         "text-offset": [0, 2.1], "text-anchor": "top",
                         "text-optional": True},
              "paint": {"icon-color": cat_colors,
