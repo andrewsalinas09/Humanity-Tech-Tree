@@ -1,6 +1,8 @@
 # Architecture (current state)
 
-The living description of the design as it stands. `Node.cpp` / `AttributeRegistry.h` are the source of truth for exact fields; this doc explains the *systems*. Rationale lives in `docs/decisions/`; unresolved items in `docs/OPEN-QUESTIONS.md`.
+> **Derived document.** `docs/SCHEMA.md`, the ADRs, and `docs/TESTBED.md` are normative — on any conflict with this summary, they win. `Node.cpp` is a historical sketch.
+
+The living description of the design as it stands: this doc explains the *systems*; exact fields live in SCHEMA.md; rationale in `docs/decisions/`; unresolved items in `docs/OPEN-QUESTIONS.md`.
 
 ## 1. The graph
 
@@ -22,7 +24,7 @@ Node creation is gated by the six-rule **Significance Filter** (ADR-0009); minor
 ### Nodes (`HistoryNode`)
 - **Identity:** UUID, optional `wikidata_id`, `slug`, `name` + `aliases` (aliases power search-first dedup).
 - **Category** (`NodeCategory`): biological entity → … → technology. TOOL/COMPONENT/ARTIFACT are deliberately collapsed into TECHNOLOGY — "everything is a technology unless absolutely necessary."
-- **State:** LOCKED / THEORETICAL / REALIZED is **computed** from (Time + Location + Node) — ADR-0002/0026; no state fields are stored (audit complete 2026-08-09). TB-041 rule: the parentless magic-box-REALIZED default applies only to validity=current_truth nodes — hypothetical validity blocks realization regardless of parents, so hypothetical leaves (room-temp superconductor) keep their pre-built child trees locked until the physics lands.
+- **State:** LOCKED / THEORETICAL / REALIZED is **computed** from (Time + Location + Node) — ADR-0002/0026; no state fields are stored (audit complete 2026-08-08). TB-041 rule: the parentless magic-box-REALIZED default applies only to validity=current_truth nodes — hypothetical validity blocks realization regardless of parents, so hypothetical leaves (room-temp superconductor) keep their pre-built child trees locked until the physics lands.
 - **Regional availability:** per-region `Timeline` of `TimeSegment`s (KnowledgeStatus: active/theoretical/lost/obsolete/mythical + `transition_reason_slug`), `is_indigenous`, `import_source`, per-claim citations. Models lost knowledge (Roman concrete) and multi-origin tech (gunpowder); the anti-Eurocentrism mechanism.
 - **Attributes:** `base_attributes` (AttributeID → variant value, interned via `AttributeRegistry`); process nodes carry `AttributeModifier`s (SET/ADD/MULTIPLY). See §3.
 
@@ -44,9 +46,9 @@ First-class, with own identity and metadata:
 - **Graceful ignorance:** dependency-less nodes are magic-box REALIZED leaves; unknown IDs become STUB nodes; filling gaps later re-propagates state. The graph must tolerate being incomplete everywhere, always.
 - **Diagnostics:** LCA analysis explains invalid connections and offers quick-fixes (swap / reclassify / widen). Impact analysis (kill-a-node) shows downstream collapse vs. multi-path survivors. **Entailment-vs-fact contradiction is a missing-node detector** (TB-042): a node whose validity is current_truth but whose support paths all fail is *unrealized* — the same bounty mechanic as "iPhone has no path through battery," localizing exactly where the graph is incomplete.
 
-## 3. Storage & runtime (ADR-0010)
+## 3. Storage & runtime (ADR-0031, superseding ADR-0010's Neo4j half)
 
-Neo4j stores the graph and serves fat subgraph queries; a C++ engine owns all decision logic (constraints, modifiers, overrides, cycle detection, temporal validation) over the in-memory subgraph. Attribute maps serialize as JSON properties. `AttributeRegistry` interns attribute names to uint32 IDs (thread-safe singleton). API/server layer between them: undecided (Q-16). Phase 1 skips Neo4j entirely (ADR-0014).
+**Postgres is the system of record**: append-only assertions (ADR-0038 identity/assertion split), edges physically partitioned by the 8 basis types, pgvector for embeddings, app-level ChangeRequests with commutative set-union apply. The **canonical truth is the exported JSONL fact log** — any engine is a replaceable index over it. The solver runs **in memory over fat subgraph reads and skeleton snapshots** (the surviving ADR-0010 insight: ~1B edges ≈ 8–16GB packed — the store never traverses); entailments are **three-valued** (ADR-0037). Solver language/runtime remains open (Q-16). Full detail: SCHEMA.md §8–9 and ADR-0031's Traversal Analysis.
 
 ## 4. The human layer
 

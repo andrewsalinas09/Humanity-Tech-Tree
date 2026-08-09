@@ -1,7 +1,7 @@
 # ADR-0021: Redundant truth is shadowed, never removed
 
 - **Status:** Accepted (resolves Q-06)
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user question "do we break iPhone → camera?", restart session 2; motivating cases TB-025, TB-035
 
 ## Context

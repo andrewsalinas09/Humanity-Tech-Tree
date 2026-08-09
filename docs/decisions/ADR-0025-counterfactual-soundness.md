@@ -1,7 +1,7 @@
 # ADR-0025: Counterfactual soundness — possibility propagates only through necessary dependencies
 
 - **Status:** Accepted
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user, restart session 2 ("could we have had steam engines in Roman times? Maybe — but not if we depend on an 1800 paper for no reason")
 
 ## Context

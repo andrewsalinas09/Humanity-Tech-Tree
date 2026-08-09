@@ -1,12 +1,12 @@
 # Schema v1 — Phase 1 close-out
 
-**Status: FROZEN v1** (2026-08-10). This document is the canonical schema; `Node.cpp`/`AttributeRegistry.h` are now historical sketches. Changes to anything here require an ADR and must pass the three constitutional screens — **ADR-0015** (can this ever assert something false?), **ADR-0023** (does the result depend on edit order?), **ADR-0026** (citable fact, or answer the graph should produce?) — plus the hardening rules **ADR-0035 H1–H17**, and must break no TESTBED case (64 at freeze).
+**Status: FROZEN v1** (2026-08-08; revised same-day per external review → ADR-0037/0038). **Document authority:** SCHEMA.md, the ADRs, and TESTBED.md are **normative**; ARCHITECTURE.md and README.md are derived summaries — on any conflict, the normative set wins. `Node.cpp`/`AttributeRegistry.h` are historical sketches. Changes here require an ADR and must pass the four constitutional screens — **ADR-0015** (can this ever assert something false?), **ADR-0023** (does the result depend on edit order?), **ADR-0026** (citable fact, or answer the graph should produce?), **ADR-0038** (does each reference point to an identity [semantics] or an assertion [evidence]?) — plus the hardening rules **ADR-0035 H1–H17**, and must break no TESTBED case (67 at freeze).
 
 ---
 
 ## 1. The model in one paragraph
 
-The store holds only **ground facts** — citable observations, appended forever, never edited or deleted (corrections are new facts). Facts describe **nodes** (things), **edges** (relations between things, in an 8-type orthogonal basis), and **events** (submissions, citations, verifications, votes, challenges, merges). Everything else — node state, effective dependencies, earliest-possible dates, verification levels, confidence scores, buildability, conditionality — is an **entailment** computed at query time and never stored (caches permitted, never authoritative). All writes flow through **ChangeRequests** (shadow branches) applied as commutative set-unions; humans and agents author under identical rules; verification is the human-paced bottleneck by design.
+The store holds only **ground facts** — citable observations, appended forever, never edited or deleted (corrections are new facts). Every fact is an **assertion** with a stable `assertion_id` (= its fact-log line ID): subject identity + field/predicate + value (ADR-0038). Facts describe **nodes** (things), **edges** (relations between things, in an 8-type orthogonal basis), and **events** (submissions, citations, verifications, votes, challenges, merges). Everything else — node state, effective dependencies, earliest-possible dates, verification levels, confidence scores, realizability, conditionality — is an **entailment** computed at query time, **three-valued** (SATISFIED / VIOLATED / UNKNOWN — ADR-0037: absence of evidence never becomes YES), and never stored (caches permitted, never authoritative). **The reference invariant (ADR-0038): references between graph semantics point to *identities*; evidence and history point to *assertions*.** All writes flow through **ChangeRequests** (shadow branches) applied as commutative set-unions; humans and agents author under identical rules; verification is the human-paced bottleneck by design.
 
 ## 2. Node
 
@@ -48,7 +48,7 @@ IS_TYPE_OF poly-hierarchy is legal (H17). Effective requirements = AND across al
 | `truth_level` | enum EpistemicStatus (mainstream_fact → mythology) | ADR-0027 |
 | `validity` | enum ValidityStatus | ADR-0027 — disproven mechanisms between valid nodes |
 | `start_date`, `end_date` | DatePoint? | multiple active periods = multiple edges |
-| `constraints` | AttributeConstraint[] (GT/LT/EQ/CONTAINS) | ADR-0005 — consumer defines the need; undeclared provider attribute → passes as *presumed-satisfiable*, labeled (permissive-monotone default, TB-066) |
+| `constraints` | AttributeConstraint[] (GT/LT/EQ/CONTAINS) | ADR-0005 — consumer defines the need; evaluation is three-valued (ADR-0037): undeclared attribute or overlapping uncertainty → **UNKNOWN** (never a silent pass, never a block); certain violation → VIOLATED |
 | `optimization_factor` | OptimizationFactors? | trade-off deltas |
 | `shadowed_by_edge_ids` | edge_id[] | ADR-0021; re-validated on covering-edge change; exempt from implicit-AND (H12) |
 | `impact_weight` | float | subjective, labeled as such |
@@ -75,7 +75,7 @@ Citations attach per claim (node, edge, regional entry) as claim→source edges 
 
 ## 4. RequirementExpr (ADR-0017 + hardening)
 
-Boolean tree on the consumer node: leaves = edge IDs; AND/OR/NOT, arbitrary nesting; absent = AND of all hard edges. Evaluation rules: leaves map through inheritance overrides — EXCLUDE prunes its leaf, all-pruned connectives prune recursively as *vacuous* (H11); shadowed edges are exempt from implicit-AND and satisfied by any covering edge (H12); implicit-AND operates over claim-equivalence classes (H13); NOT is legal but discouraged (breaks monotonicity; NOT ≠ EXCLUDE — ADR-0019 §5).
+Boolean tree on the consumer node: leaves = **edge identities** (never assertion IDs — ADR-0038 invariant); AND/OR/NOT, arbitrary nesting; absent = AND of all hard edges. Evaluation is **three-valued with Kleene composition** (ADR-0037): AND — VIOLATED dominates, UNKNOWN dominates SATISFIED; OR — SATISFIED dominates, UNKNOWN dominates VIOLATED; NOT swaps SATISFIED/VIOLATED, UNKNOWN unchanged. Leaves map through inheritance overrides — EXCLUDE prunes its leaf as *vacuous* (removed — distinct from UNKNOWN), all-pruned connectives prune recursively (H11); shadowed edges are exempt from implicit-AND and satisfied by any covering edge (H12); implicit-AND operates over claim-equivalence classes (H13); NOT is legal but discouraged (NOT ≠ EXCLUDE — ADR-0019 §5). Top-level realizability lattice: PROVEN_REALIZABLE / UNKNOWN / PROVEN_UNREALIZABLE, with LOCKED/THEORETICAL/REALIZED as derived UI vocabulary; every result carries its per-claim gap list (the UNKNOWN set).
 
 ## 5. Trust & verification (events, all computed downstream)
 
@@ -100,21 +100,29 @@ Sources are first-class nodes (WORK_PUBLICATION and kin), including **method sou
 **Ground truth is the fact log** (§9); all tables below are rebuildable projections/indexes over it.
 
 ```sql
--- Append-only core (no UPDATE/DELETE on truth columns; supersession by new rows)
-nodes            (id, slug, created_by_cr, migrated_to NULL)          -- hot projection
-node_versions    (version_id, node_id, prev_version_id, payload JSONB,
-                  author, cr_id, recorded_at, change_summary)
-edges            (id, from_node, to_node, type, qualifier, payload JSONB,
-                  recorded_at, superseded_at NULL)
+-- Append-only core (no UPDATE/DELETE on truth columns; supersession by new assertions).
+-- ADR-0038 split everywhere: *_identities = enduring semantic things (what references target);
+--                             assertions   = dated claims about them (what evidence targets).
+
+node_identities  (node_id, slug, created_by_cr, migrated_to NULL)     -- redirects live on identity
+edge_identities  (edge_id, from_node, to_node, type, qualifier, created_by_cr)
                   PARTITION BY LIST (type)                            -- the 8 basis types, physically
-citations        (claim_kind, claim_id, source_node, recorded_at, superseded_at)
-verification_events (id, claim_kind, claim_id, kind,                 -- l3_run | l4_confirm | vote |
+assertions       (assertion_id,            -- = fact-log fact_id (stable, citable)
+                  subject_kind, subject_id,-- node_identity | edge_identity | source | ...
+                  field_path,              -- e.g. base_attributes.melting_point / validity / start_date
+                  value JSONB,
+                  author, cr_id, recorded_at, superseded_by NULL)
+citations        (citation_id, claim_assertion_id, source_node, recorded_at, superseded_by)
+verification_events (event_id, claim_assertion_id, kind,             -- l3_run | l4_confirm | vote |
                   actor, model_version, payload JSONB, recorded_at)  -- challenge | discredit | vouch | slash
-change_requests  (id, proposer, status, base_snapshot, assertions JSONB[],
+change_requests  (id, proposer, status, base_snapshot, assertion_ids[],
                   votes, recorded_at, merged_at, merge_log JSONB)    -- the shadow branch (app object)
 embeddings       (node_id, model_version, vec vector)                -- pgvector; sidecar jump ~50M (Q-20)
--- Indexes: edges(from_node), edges(to_node), edges(qualifier), nodes(slug),
---          trigram on aliases/name_history, GIN on payloads, per-partition B-trees.
+-- Semantic references (RequirementExpr leaves, shadowed_by, overrides, taxonomy, redirects)
+--   → identities. Evidence (citations, verifications, supersession, as-of) → assertion_ids.
+-- As-of: identity + record time T → the authoritative assertion set at T (ADR-0034/0038).
+-- Indexes: edge_identities(from_node), (to_node), (qualifier); assertions(subject_id, field_path);
+--          nodes trigram on aliases/name_history; GIN on values; per-partition B-trees.
 -- Caches (never authoritative, ADR-0026): dependency_mass, subtree citation-debt counts.
 ```
 
@@ -125,10 +133,10 @@ embeddings       (node_id, model_version, vec vector)                -- pgvector
 One JSON object per line; append-only; content-hashable for snapshots. Every fact: `fact_id`, `kind`, `recorded_at`, `cr_id`, `author {type: human|agent, id, model?, version?}`, `body`.
 
 ```jsonl
-{"fact_id":"f_01","kind":"node.assert","recorded_at":"2026-08-10T18:22:03Z","cr_id":"cr_a1","author":{"type":"agent","id":"seed-pipeline-1","model":"claude-fable-5"},"body":{"node_id":"n_tsf","slug":"802-11-tsf","name":"Timing Synchronization Function","category":"METHOD_TECHNIQUE","validity":"current_truth"}}
-{"fact_id":"f_02","kind":"edge.assert","recorded_at":"2026-08-10T18:22:04Z","cr_id":"cr_a1","author":{"type":"agent","id":"seed-pipeline-1","model":"claude-fable-5"},"body":{"edge_id":"e_77","from":"n_tsf","to":"n_80211_family","type":"IS_COMPONENT_OF","qualifier":null,"start_date":{"year":1997.0,"uncertainty":0.5,"timescale":"HISTORICAL"}}}
-{"fact_id":"f_03","kind":"citation.attach","recorded_at":"2026-08-10T18:25:11Z","cr_id":"cr_a1","author":{"type":"human","id":"andrew"},"body":{"claim":"e_77","source_node":"n_src_ieee80211_1997"}}
-{"fact_id":"f_04","kind":"verify.l3","recorded_at":"2026-08-10T18:26:40Z","cr_id":null,"author":{"type":"agent","id":"verifier-fleet","model":"claude-fable-5","verifier_version":"v1.0"},"body":{"claim":"e_77","source_node":"n_src_ieee80211_1997","result":"supports"}}
+{"fact_id":"f_01","kind":"node.assert","recorded_at":"2026-08-08T18:22:03Z","cr_id":"cr_a1","author":{"type":"agent","id":"seed-pipeline-1","model":"claude-fable-5"},"body":{"node_id":"n_tsf","slug":"802-11-tsf","name":"Timing Synchronization Function","category":"METHOD_TECHNIQUE","validity":"current_truth"}}
+{"fact_id":"f_02","kind":"edge.assert","recorded_at":"2026-08-08T18:22:04Z","cr_id":"cr_a1","author":{"type":"agent","id":"seed-pipeline-1","model":"claude-fable-5"},"body":{"edge_id":"e_77","from":"n_tsf","to":"n_80211_family","type":"IS_COMPONENT_OF","qualifier":null,"start_date":{"year":1997.0,"uncertainty":0.5,"timescale":"HISTORICAL"}}}
+{"fact_id":"f_03","kind":"citation.attach","recorded_at":"2026-08-08T18:25:11Z","cr_id":"cr_a1","author":{"type":"human","id":"andrew"},"body":{"claim":"e_77","source_node":"n_src_ieee80211_1997"}}
+{"fact_id":"f_04","kind":"verify.l3","recorded_at":"2026-08-08T18:26:40Z","cr_id":null,"author":{"type":"agent","id":"verifier-fleet","model":"claude-fable-5","verifier_version":"v1.0"},"body":{"claim":"e_77","source_node":"n_src_ieee80211_1997","result":"supports"}}
 ```
 
 **Snapshot permalinks (ADR-0034):** `htt://snapshot/2031-03-15` (date-based) and `htt://snapshot/sha256-…` (content hash of the log prefix); resolving yields the as-of view; citation exports emit {as-of bundle, current bundle, structured diff}.
@@ -178,6 +186,7 @@ Priors: epistemic enum shifts the squash midpoint (mythology ≫ mainstream_fact
 
 ## 13. Implementation checklist (Phase 2 inherits; H-rules as requirements)
 
+0. **Reference semantics kernel + invariant test suite** (before anything user-facing): a small executable library — append facts, as-of/identity/supersession resolution, three-valued RequirementExpr evaluation (ADR-0037), taxonomy inheritance, regional availability, cycle detection — with ~20 of the nastiest TESTBED cases as automated tests. Prose semantics → executable semantics → data; agents implement against the kernel, never against their own reading of this document.
 1. Postgres schema + fact-log writer/exporter (§8–9) — with H4 apply-time redirect walk, H9 post-merge recheck.
 2. MCP server (§12) with per-agent rate budgets and machine-readable rejections.
 3. Existence gate (Q-20 pipeline; embeddings versioned from day one).

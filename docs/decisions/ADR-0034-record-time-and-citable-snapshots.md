@@ -1,7 +1,7 @@
 # ADR-0034: Record time is first-class — as-of views and citable snapshots
 
 - **Status:** Accepted
-- **Date:** 2026-08-10
+- **Date:** 2026-08-08
 - **Source:** user directive, restart session 3 ("see the citations for a set of nodes AT THE TIME and also CURRENT")
 
 ## Context

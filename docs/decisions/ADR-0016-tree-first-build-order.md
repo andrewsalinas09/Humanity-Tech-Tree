@@ -1,7 +1,7 @@
 # ADR-0016: Tree-first build order — the graph is the product; the solver is a later feature
 
 - **Status:** Accepted (supersedes ADR-0014)
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user, restart session 2
 
 ## Context

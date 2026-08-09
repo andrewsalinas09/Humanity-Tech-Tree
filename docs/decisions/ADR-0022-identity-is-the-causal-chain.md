@@ -1,7 +1,7 @@
 # ADR-0022: Identity is the causal chain; names and brands are data, promotable to nodes
 
 - **Status:** Accepted
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user exercise (product morphing / Ship of Theseus, TB-036); worked example `docs/examples/product-morphing-worked-example.md`
 
 ## Context

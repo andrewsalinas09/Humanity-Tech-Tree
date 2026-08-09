@@ -1,7 +1,7 @@
 # ADR-0015: The prime directive — the graph can never state wrong information, only incomplete information
 
 - **Status:** Accepted
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user, restart session 2 (generalizing ADR-0003 and the "Lazy Split" principle)
 
 ## Context

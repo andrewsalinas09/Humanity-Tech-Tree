@@ -1,7 +1,7 @@
 # ADR-0024: Edge types are a minimal orthogonal basis — the traversal partition key
 
 - **Status:** Accepted (revised same-day with the user's underlying rationale)
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user directive + rationale, restart session 2
 
 ## Context

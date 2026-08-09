@@ -1,7 +1,7 @@
 # ADR-0033: Continuous computed confidence alongside the discrete ladder
 
 - **Status:** Accepted
-- **Date:** 2026-08-10
+- **Date:** 2026-08-08
 - **Source:** user rulings, restart session 3 (endorsed the three-quantity separation; chose bands+hover display; motivation: "research quality and research tool that's cited, but also users have fun with it")
 
 ## Context

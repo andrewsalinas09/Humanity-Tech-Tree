@@ -1,7 +1,7 @@
 # ADR-0020: Specialization is additive; uneven resolution is normal
 
 - **Status:** Accepted
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user edge case (iPhone front camera, TB-035); worked example `docs/examples/iphone-camera-worked-example.md`
 
 ## Context

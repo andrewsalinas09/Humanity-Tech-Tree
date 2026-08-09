@@ -1,7 +1,7 @@
 # ADR-0027: Two orthogonal truth axes; validity lives on both nodes and edges
 
 - **Status:** Accepted (resolves Q-02)
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user rulings via direct questions, restart session 2
 
 ## Context

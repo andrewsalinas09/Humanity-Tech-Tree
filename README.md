@@ -20,8 +20,10 @@ Start with **[CLAUDE.md](CLAUDE.md)** — the map and working rules (written for
 |---|---|
 | [docs/VISION.md](docs/VISION.md) | Why this exists |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Current design: graph model, solver semantics, storage, moderation |
-| [docs/decisions/](docs/decisions/) | 14 architecture decision records — the settled "why"s |
-| [docs/OPEN-QUESTIONS.md](docs/OPEN-QUESTIONS.md) | 16 unresolved design questions |
+| [docs/SCHEMA.md](docs/SCHEMA.md) | **The frozen v1 schema (normative)** |
+| [docs/decisions/](docs/decisions/) | 38 architecture decision records — the settled "why"s (normative) |
+| [docs/TESTBED.md](docs/TESTBED.md) | 67 edge-case acceptance tests (normative) |
+| [docs/OPEN-QUESTIONS.md](docs/OPEN-QUESTIONS.md) | Open design questions (most now resolved → ADRs) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phases and current focus |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | Domain vocabulary |
 | [docs/WORKLOG.md](docs/WORKLOG.md) | Session journal |

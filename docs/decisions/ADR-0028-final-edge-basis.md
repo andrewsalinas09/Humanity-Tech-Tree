@@ -1,7 +1,7 @@
 # ADR-0028: The final edge basis — 8 types — and the legacy migration table
 
 - **Status:** Accepted (closes Q-21)
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user rulings across restart session 2; partition test per ADR-0024
 
 ## Context

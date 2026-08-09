@@ -1,7 +1,7 @@
 # ADR-0030: Citation is first-class; submissions are never citation-gated
 
 - **Status:** Accepted
-- **Date:** 2026-08-10
+- **Date:** 2026-08-08
 - **Source:** user directive, restart session 3
 
 ## Context

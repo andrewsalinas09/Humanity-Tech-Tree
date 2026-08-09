@@ -40,7 +40,7 @@ Ask `buildable?(CPU, USA, 1946)` instead and the tube branch passes — ENIAC's 
 
 The attribute vocabulary is unbounded data (any name interned on first use, LLM-canonicalized — never a schema list to complete), and nodes declare only load-bearing attributes. That is only safe because absence has defined semantics:
 
-**A constraint referencing an attribute its provider has not declared passes as *presumed-satisfiable*, visibly labeled.** Never a failure, never an error.
+**A constraint referencing an attribute its provider has not declared evaluates to UNKNOWN** (ADR-0037 — revised from the earlier "presumed-satisfiable pass," which was a hand-rolled UNKNOWN rendered as YES). Never a failure, never an error, never a block — and never a silent yes: UNKNOWN composes through the expression by Kleene rules and appears in the gap list; the browse view may render it optimistically, the research view conservatively.
 
 - *Why permissive:* failing on unknowns would make incompleteness break the graph (ADR-0015 forbids that); passing-labeled errs exactly as TB-001 errs — technically-true-until-constrained.
 - *Why monotone:* declaring an attribute can only prune more, never un-prune — so lazy addition in any order converges (ADR-0023 holds), and no one must pre-enumerate anything.

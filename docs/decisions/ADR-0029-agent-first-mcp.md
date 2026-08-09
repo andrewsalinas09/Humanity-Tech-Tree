@@ -1,7 +1,7 @@
 # ADR-0029: Agent-first authoring; MCP is a first-class interface
 
 - **Status:** Accepted
-- **Date:** 2026-08-10
+- **Date:** 2026-08-08
 - **Source:** user directive, restart session 3 ("MCP needs to be first class as this is only tractable BECAUSE of LLMs")
 
 ## Context

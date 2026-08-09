@@ -1,7 +1,7 @@
 # ADR-0032: The verification ladder — five computed levels from uncited to community-ratified
 
 - **Status:** Accepted
-- **Date:** 2026-08-10
+- **Date:** 2026-08-08
 - **Source:** user sketch ("maximum additions and maximum truthfulness"), fleshed out per their delegation; completes ADR-0030
 
 ## Context

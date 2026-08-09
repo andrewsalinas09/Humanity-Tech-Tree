@@ -1,4 +1,4 @@
-# Architecture stress test — 2026-08-10
+# Architecture stress test — 2026-08-08
 
 Adversarial red-team of the full design (34 ADRs, 46 TB cases at time of test), run as a 17-agent workflow: 7 finders locked to distinct attack dimensions (temporal, mutation, errors, solver, concurrency, trust, identity), forbidden from re-reporting TESTBED-covered ground → dedup (28 raw → 26 distinct) → skeptic verifiers defending the architecture, walking each scenario through documented mechanisms.
 

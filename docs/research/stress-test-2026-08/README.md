@@ -1,4 +1,4 @@
-# Stress test 2026-08-10 — full adversarial record
+# Stress test 2026-08-08 — full adversarial record
 
 This folder preserves the COMPLETE red-team record for future agents: every surviving finding's full scenario, claimed failure, and the skeptic verifier's complete adjudication. Summary + reading of results: `../2026-08-stress-test-report.md`. Hardening rules produced: **ADR-0035 (H1-H17)**; test cases **TB-047..TB-063**.
 

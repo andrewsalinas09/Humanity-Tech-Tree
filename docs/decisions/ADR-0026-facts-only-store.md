@@ -1,7 +1,7 @@
 # ADR-0026: The store holds only ground facts; everything else is entailment
 
 - **Status:** Accepted
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user hard-lock, restart session 2 ("ONLY write down facts... we write down things, and then we solve what results from it")
 
 ## Context

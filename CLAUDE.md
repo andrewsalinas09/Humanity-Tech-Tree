@@ -32,4 +32,5 @@ A knowledge graph of all human technology and culture. Nodes are things (technol
 4b. **Every edge case goes to TESTBED.md the moment it's raised** — before it's solved. Every design change must be checked against every TB case, and must obey the prime directive (ADR-0015): failure modes may produce incompleteness, never wrongness.
 5. **End every session with a WORKLOG entry.** What changed, what was learned, what's next. Use the template at the top of `docs/WORKLOG.md`.
 6. **Living docs describe *now*.** `ARCHITECTURE.md`, `GLOSSARY.md`, `ROADMAP.md` are always current-state — update them in place. History belongs in ADRs, the worklog, and git.
-7. **Schema changes touch three places:** the code sketch, `ARCHITECTURE.md`, and (if a decision was involved) an ADR.
+7. **Schema changes touch SCHEMA.md** (normative) and, if a decision was involved, an ADR; then sync the derived summaries.
+8. **Document authority:** `SCHEMA.md`, ADRs, and `TESTBED.md` are normative; `ARCHITECTURE.md` and `README.md` are derived — on conflict, normative wins. `Node.cpp` is a historical sketch.

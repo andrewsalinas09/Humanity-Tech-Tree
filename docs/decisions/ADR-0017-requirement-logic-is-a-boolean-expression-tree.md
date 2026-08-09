@@ -1,7 +1,7 @@
 # ADR-0017: Requirement logic is a boolean expression tree on the consumer node
 
 - **Status:** Accepted (resolves Q-01; replaces both prior designs)
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user + assistant, restart session 2
 
 ## Context

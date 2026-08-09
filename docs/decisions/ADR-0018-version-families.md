@@ -1,7 +1,7 @@
 # ADR-0018: Version families — flat significance-gated stars with truth-granular feature attachment
 
 - **Status:** Accepted (resolves Q-18)
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** worked example `docs/examples/802-11-worked-example.md` (validated against 802.11, Thunderbolt, DDR, and the CPU fan-out case)
 
 ## Context

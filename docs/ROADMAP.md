@@ -3,10 +3,10 @@
 Phases follow ADR-0016 (tree first; solver is Phase 4). This file always states the **current focus** — update it when the focus changes.
 
 ## Current focus
-**Phase 1 COMPLETE pending user review of `docs/SCHEMA.md`** — the frozen v1 close-out: field definitions, Postgres physical design, JSONL fact log, snapshot permalinks, linter/breaker table, qualifier vocabulary, confidence formula sketch, MCP surface, implementation checklist. Achieved: 36 ADRs, 64 TESTBED cases all Solved, 0 breaks under a 17-agent adversarial stress test, backend ratified (ADR-0031). On sign-off: **Phase 2 build begins** — Postgres schema + fact log, MCP server, existence gate, read-only viewer, and the iPhone-all-the-way-up seed corridor.
+**Phase 1 reviewed and revised.** External pre-build review adopted (2026-08-08): ADR-0037 (three-valued entailment — UNKNOWN is first-class), ADR-0038 (assertions first-class + identity/assertion reference invariant, the fourth constitutional screen), document authority hierarchy established (SCHEMA/ADRs/TESTBED normative; ARCHITECTURE/README derived). **Phase 2 order:** (0) reference semantics kernel + ~20 TESTBED cases as executable tests → (1) Postgres schema + fact log → (2) MCP server → (3) existence gate → (4) read-only viewer → (5) the iPhone-all-the-way-up seed corridor, where reality attacks the ontology.
 
 ## Phase 0 — Consolidation ✅ (2026-08-08)
-Doc system built; 10k lines of old chats distilled into ADRs, open questions, digests. Test bed established (2026-08-09).
+Doc system built; 10k lines of old chats distilled into ADRs, open questions, digests. Test bed established (2026-08-08).
 
 ## Phase 1 — Schema lock + test bed
 - Every TESTBED case Solved (design) or explicitly accepted-open (like Q-10 quantities).

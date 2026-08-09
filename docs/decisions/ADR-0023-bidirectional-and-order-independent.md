@@ -1,7 +1,7 @@
 # ADR-0023: Navigable both ways; convergent under any authoring order
 
 - **Status:** Accepted
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user, restart session 2 ("Nokia to paper mill and paper mill to phone and anywhere in between — they can add it anywhere and not be wrong")
 
 ## Context

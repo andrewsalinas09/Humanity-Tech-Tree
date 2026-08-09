@@ -1,7 +1,7 @@
 # ADR-0031: Postgres-first backend; branching and versioning are application-level
 
-- **Status:** Accepted (ratified by user 2026-08-10; deep-traversal concern raised and addressed — see Traversal Analysis below)
-- **Date:** 2026-08-10
+- **Status:** Accepted (ratified by user 2026-08-08; deep-traversal concern raised and addressed — see Traversal Analysis below)
+- **Date:** 2026-08-08
 - **Source:** three-stream research synthesis (`docs/research/2026-08-backend-synthesis.md`); supersedes the storage half of ADR-0010 (the in-memory-solver split survives)
 
 ## Context

@@ -1,7 +1,7 @@
 # ADR-0036: Vantage-point neutrality — the rules are viewpoint-blind; only facts dictate
 
 - **Status:** Accepted
-- **Date:** 2026-08-10
+- **Date:** 2026-08-08
 - **Source:** user directive, restart session 3 ("we cannot favor any vantage point. Only facts can dictate anything.")
 
 ## Context

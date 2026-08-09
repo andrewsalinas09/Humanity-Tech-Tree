@@ -1,7 +1,7 @@
 # ADR-0019: Family edges are inheritable defaults; instances may widen OR exclude them
 
 - **Status:** Accepted
-- **Date:** 2026-08-09
+- **Date:** 2026-08-08
 - **Source:** user edge case, restart session 2 (iPhone-without-WiFi / front-camera case, TB-034)
 
 ## Context
