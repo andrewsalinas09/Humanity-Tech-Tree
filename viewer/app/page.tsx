@@ -380,8 +380,11 @@ export default function Home() {
   };
 
   const resolveTicket = async (t: any, opt: any) => {
-    const choice: any = { key: opt.key };
-    if (opt.node_id) choice.node_id = opt.node_id;
+    // carry EVERY option field (intercept tickets carry leg types etc.);
+    // marker fields get prompted below
+    const choice: any = {};
+    for (const [k, v] of Object.entries(opt))
+      if (k !== "justification_required") choice[k] = v;
     if ("exclude" in opt) {
       const x = window.prompt("Providers to EXCLUDE from the hoist (comma-separated ids):", "");
       if (x === null) return;
@@ -663,6 +666,49 @@ export default function Home() {
     litEdgeRef.current = null;
     if (mapRef.current) clearDim(mapRef.current);
   };
+  // intercept ("X goes in the middle") + mark-covered: THE two shadow makers
+  const [edgeTool, setEdgeTool] = useState<string | null>(null);
+  const [viaPick, setViaPick] = useState("");
+  const [coverCands, setCoverCands] = useState<any[]>([]);
+  const [coverPicked, setCoverPicked] = useState<Set<string>>(new Set());
+
+  const submitIntercept = async () => {
+    if (!viaPick || !edgeCard) return;
+    const res = await api("/verb", { name: "intercept",
+      params: { edge_id: edgeCard.edge_id, via: viaPick } });
+    if (res.rejected) alert(`${res.rejected.rule}: ${res.rejected.message}`);
+    else if (res.ticket)
+      alert(`Ticket #${res.ticket}: choose the two leg types in the Tickets tab.`);
+    else alert("Intercepted — the old edge is now covered history.");
+    setEdgeTool(null); setViaPick("");
+  };
+
+  const openCoverTool = async () => {
+    if (!edgeCard) return;
+    setEdgeTool("cover"); setCoverPicked(new Set());
+    const [a, b] = await Promise.all([
+      (await fetch(`${TILER}/node/${edgeCard.from}`)).json(),
+      (await fetch(`${TILER}/node/${edgeCard.to}`)).json()]);
+    const cands = [...(a.requires ?? []), ...(a.enables ?? []),
+                   ...(b.requires ?? []), ...(b.enables ?? [])]
+      .filter((e: any) => e.edge_id !== edgeCard.edge_id && !e.shadowed);
+    const seen = new Set<string>();
+    setCoverCands(cands.filter((e: any) =>
+      seen.has(e.edge_id) ? false : (seen.add(e.edge_id), true)));
+  };
+
+  const submitCover = async () => {
+    if (!edgeCard || coverPicked.size === 0) return;
+    const confirmation = window.prompt(
+      "Why does that path fully cover this edge? (recorded)") ?? "";
+    if (!confirmation) return;
+    const res = await api("/verb", { name: "mark_shadowed",
+      params: { edge_id: edgeCard.edge_id, covering: [...coverPicked],
+                confirmation } });
+    if (res.rejected) alert(`${res.rejected.rule}: ${res.rejected.message}`);
+    else { setEdgeTool(null); openEdge(edgeCard.edge_id); }
+  };
+
   const edgeAction = async (kind: "cite" | "dispute" | "delete") => {
     const eid = edgeCard?.edge_id;
     if (!eid) return;
@@ -1130,11 +1176,57 @@ export default function Home() {
                   {" · "}{edgeCard.edge_id}
                 </div>}
               <div style={{ marginTop: 8 }}>
+                <button onClick={() => { setEdgeTool(edgeTool === "via" ? null : "via");
+                                         setViaPick(""); }}
+                        style={S.miniBtn}>⇅ insert between</button>
+                <button onClick={openCoverTool} style={S.miniBtn}>≡ mark covered</button>
                 <button onClick={() => edgeAction("cite")} style={S.miniBtn}>📖 cite</button>
                 <button onClick={() => edgeAction("dispute")} style={S.miniBtn}>⚑ dispute</button>
                 <button onClick={() => edgeAction("delete")} style={S.miniBtn}>🗑 delete</button>
                 <button onClick={closeEdge} style={S.miniBtn}>close</button>
               </div>
+              {edgeTool === "via" && (
+                <div style={S.orBox}>
+                  <div style={S.orTitle}>
+                    this edge is too coarse — what sits in the middle?</div>
+                  {viaPick
+                    ? <div style={{ margin: "4px 0" }}>
+                        <Chip ok label={viaPick} />{" "}
+                        <button style={S.miniBtn}
+                                onClick={() => setViaPick("")}>✕</button>
+                        <button onClick={submitIntercept} style={S.solveBtn}>
+                          Insert {viaPick} between</button>
+                      </div>
+                    : <SearchBox compact placeholder="find the in-between node…"
+                        onPick={(r) => setViaPick(r.node_id)} />}
+                  <p style={{ fontSize: 11.5, opacity: 0.55, margin: "4px 0 0" }}>
+                    The old edge becomes covered history (dashed); two finer
+                    edges take its place. This is how EM→transistor got its
+                    semiconductor-physics middle.</p>
+                </div>)}
+              {edgeTool === "cover" && (
+                <div style={S.orBox}>
+                  <div style={S.orTitle}>
+                    which finer edges fully cover this one?</div>
+                  {coverCands.map((e: any) => (
+                    <label key={e.edge_id}
+                           style={{ display: "block", fontSize: 13,
+                                    cursor: "pointer", margin: "2px 0" }}>
+                      <input type="checkbox"
+                             checked={coverPicked.has(e.edge_id)}
+                             onChange={() => { const n = new Set(coverPicked);
+                               n.has(e.edge_id) ? n.delete(e.edge_id)
+                                                : n.add(e.edge_id);
+                               setCoverPicked(n); }} />
+                      {" "}{e.edge_id}{" "}
+                      <small style={{ opacity: 0.5 }}>↔ {e.other_name}</small>
+                    </label>))}
+                  <button onClick={submitCover} style={S.solveBtn}
+                          disabled={coverPicked.size === 0}>
+                    Mark covered by {coverPicked.size} edge(s)</button>{" "}
+                  <button onClick={() => setEdgeTool(null)} style={S.miniBtn}>
+                    cancel</button>
+                </div>)}
             </div>
           )}
           {!["Bounties", "Leaders", "Changes", "Tickets"].includes(tab)
