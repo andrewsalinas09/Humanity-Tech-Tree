@@ -61,10 +61,19 @@ def build_app(pinned=None):
         get a receipt. Receipts are reusable but query-bound — search for the
         NAME you intend to propose, right before proposing it (a receipt for a
         different query proves nothing about your name's duplicates).
-        Currently name/alias substring matching: also walk get_node edge
-        lists of neighbors before concluding something doesn't exist."""
+        Returns two lanes: 'matches' (exact/substring — these force duplicate
+        tickets) and 'semantic' (nearest nodes by meaning, with descriptions
+        and scores — YOU judge whether one already covers your concept; the
+        receipt records what you were shown)."""
         tok = _cred(ctx, pinned)
         return svc.search_similar(tok, query) if tok else _NO_CRED
+
+    @app.tool()
+    def list_nodes(ctx: Context, category: str = None) -> list:
+        """Browse all nodes (optionally by category) — for orienting before
+        building, when search alone isn't enough."""
+        tok = _cred(ctx, pinned)
+        return svc.list_nodes(tok, category) if tok else [_NO_CRED]
 
     @app.tool()
     def propose_node(name: str, ctx: Context, category: str = "TECHNOLOGY",

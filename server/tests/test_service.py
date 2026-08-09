@@ -21,6 +21,7 @@ def svc():
     pg.migrate(os.path.join(MIG, "003_requests.sql"))
     pg.migrate(os.path.join(MIG, "004_users.sql"))
     pg.migrate(os.path.join(MIG, "005_admin_model.sql"))
+    pg.migrate(os.path.join(MIG, "006_embeddings.sql"))
     pg.wipe()
     with pg.conn.cursor() as c:
         c.execute("TRUNCATE credentials, users, requests, request_endorsements, "

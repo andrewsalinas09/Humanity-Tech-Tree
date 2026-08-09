@@ -76,7 +76,7 @@ Family root + significance-gated flat version stars + truth-granular feature att
 ## Q-19: Authoring UX for high-fan-in nodes (TB-027)
 How a contributor adds something like the ASML EUV machine, whose true parents span dozens of domains, without the half-finished node being wrong (it can't be, per ADR-0015 — but it must also not be *useless*). Candidates: domain-sectioned templates, "known-incomplete" badges, LLM-suggested parent checklists, bounties for missing sections.
 
-## Q-20: Semantic existence-search infrastructure (TB-032)
+## Q-20: Semantic existence-search infrastructure (TB-032) — **Resolved → ADR-0048**
 The "does this node already exist?" pipeline at billion-node scale: embed every node at creation, ANN candidate retrieval, LLM same/child/new judgment, stub on uncertainty. Feasibility is not the question (billion-scale ANN is proven); to design: embedding model choice + re-embedding strategy, candidate thresholds, the judgment prompt/criteria, and how the pipeline enforces the create-don't-merge asymmetry (duplicates are incomplete; wrong merges are wrong). This is also the backbone of the ADR-0013 embedding sentinel and the contextual search features — likely one shared service.
 
 ## Q-21: EdgeType reduction to the orthogonal basis — **Resolved → ADR-0028**

@@ -17,6 +17,8 @@ from httk import Store, View, realizable
 from httk import verbs as VB
 from httk.verbs import StagedFacts, Decision, Rejection
 
+from httkserver import embeds
+
 
 class AuthError(Exception):
     pass
@@ -150,8 +152,11 @@ class Service:
 
     # -- reads ---------------------------------------------------------------
     def search_similar(self, token, query):
-        """Deterministic v1 gate: name/alias matching → receipt. Semantic upgrade
-        (Luna/Tera-class judge) slots behind this same tool later (ADR-0041 §4)."""
+        """The two-lane existence gate (ADR-0048): exact/substring matching
+        (what forces duplicate tickets) + SEMANTIC candidates over the node
+        embeddings, with descriptions and scores — the CALLER judges (no LLM
+        in the transaction, ADR-0040; the callers are LLMs). The receipt
+        records both lanes: 'you were shown X' is on the books."""
         identity, _ = self.authenticate(token)
         _, view = self._kernel()
         q = query.lower()
@@ -160,13 +165,33 @@ class Service:
             names = [n, view.field(n, "name") or ""] + (view.field(n, "aliases", []) or [])
             if any(q == str(x).lower() or q in str(x).lower() for x in names if x):
                 hits.append({"node_id": n, "category": view.node(n)["category"]})
+        try:
+            embeds.refresh(self.pg, view)
+            semantic = embeds.semantic_search(self.pg, view, query)
+        except Exception as e:                     # gate degrades, never blocks
+            semantic = []
+            print(f"semantic lane unavailable: {e}")
         with self.pg.conn.cursor() as c:
             c.execute("INSERT INTO search_receipts (query, results, issued_to) "
                       "VALUES (%s,%s,%s) RETURNING receipt_id",
-                      (query, Jsonb(hits), Jsonb(identity)))
+                      (query, Jsonb({"matches": hits, "semantic": semantic}),
+                       Jsonb(identity)))
             rid = c.fetchone()[0]
         self.pg.conn.commit()
-        return {"receipt": rid, "matches": hits}
+        return {"receipt": rid, "matches": hits, "semantic": semantic}
+
+    def list_nodes(self, token, category=None, k=500):
+        """Browse affordance (agent friction #1b): the graph is enumerable."""
+        self.authenticate(token)
+        _, view = self._kernel()
+        out = []
+        for n in sorted(view.nodes()):
+            cat = (view.node(n) or {}).get("category")
+            if category and cat != category:
+                continue
+            out.append({"node_id": n, "name": view.field(n, "name") or n,
+                        "category": cat})
+        return out[:k]
 
     def solve(self, token, node_id, world_time=None, region=None):
         self.authenticate(token)
@@ -208,7 +233,8 @@ class Service:
             row = c.fetchone()
         if not row:
             return {"rejected": {"rule": "Q-20", "message": "unknown receipt"}}
-        _, matches = row
+        _, results = row
+        matches = results["matches"] if isinstance(results, dict) else results
         exact = [m for m in matches if m["node_id"].lower() == (node_id or name).lower()
                  or name.lower() in m["node_id"].lower()]
         if exact and duplicate_resolution is None:
