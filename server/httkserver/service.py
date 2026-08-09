@@ -285,6 +285,122 @@ class Service:
             return [{"ticket": t, "verb": v, "reason": r, "options": o}
                     for t, v, r, o in c.fetchall()]
 
+    # -- requests (the crowdsourcing loop; user rulings 2026-08-09) ------------
+    # Workflow, never facts. Kinds are the arch's own wants: WANT_NODE /
+    # WANT_COVERAGE / WANT_EVIDENCE. Close on fulfill (never wait on absent
+    # people); anyone may re-open. Karma: fulfiller 3 + endorsements, poster 1.
+
+    def post_request(self, token, want, subject_node=None, wanted_name=None,
+                     wanted_description=None, notes=None, offered_sources=None):
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        if want not in ("WANT_NODE", "WANT_COVERAGE", "WANT_EVIDENCE"):
+            return {"rejected": {"rule": "REQ", "message":
+                    "want must be WANT_NODE | WANT_COVERAGE | WANT_EVIDENCE"}}
+        if want == "WANT_NODE" and not wanted_name:
+            return {"rejected": {"rule": "REQ",
+                                 "message": "WANT_NODE needs wanted_name"}}
+        if want != "WANT_NODE":
+            _, view = self._kernel()
+            if not subject_node or not view.node(subject_node):
+                return {"rejected": {"rule": "REQ", "message":
+                        f"{want} needs an existing subject_node"}}
+        with self.pg.conn.cursor() as c:
+            c.execute(
+                "INSERT INTO requests (want, subject_node, wanted_name, "
+                "wanted_description, notes, offered_sources, requested_by) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING request_id",
+                (want, subject_node, wanted_name, wanted_description, notes,
+                 Jsonb(offered_sources or []), Jsonb(identity)))
+            rid = c.fetchone()[0]
+        return {"request": rid}
+
+    def list_requests(self, token, status="open"):
+        self.authenticate(token)
+        with self.pg.conn.cursor() as c:
+            c.execute(
+                "SELECT r.request_id, r.want, r.subject_node, r.wanted_name, "
+                "r.wanted_description, r.notes, r.offered_sources, r.status, "
+                "r.requested_by, r.fulfilled_by, r.fulfilled_links, "
+                "(SELECT count(*) FROM request_endorsements e "
+                " WHERE e.request_id = r.request_id) AS endorsements "
+                "FROM requests r WHERE (%s = 'all' OR r.status = %s) "
+                "ORDER BY endorsements DESC, r.request_id", (status, status))
+            cols = ("request", "want", "subject_node", "wanted_name",
+                    "wanted_description", "notes", "offered_sources", "status",
+                    "requested_by", "fulfilled_by", "fulfilled_links",
+                    "endorsements")
+            return [dict(zip(cols, row)) for row in c.fetchall()]
+
+    def endorse_request(self, token, request_id):
+        identity, _ = self.authenticate(token)
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT status FROM requests WHERE request_id=%s",
+                      (request_id,))
+            row = c.fetchone()
+            if not row:
+                return {"rejected": {"rule": "E404",
+                                     "message": f"request {request_id}?"}}
+            c.execute("INSERT INTO request_endorsements (request_id, endorser) "
+                      "VALUES (%s,%s) ON CONFLICT DO NOTHING",
+                      (request_id, identity.get("id")))
+        return {"endorsed": request_id}
+
+    def fulfill_request(self, token, request_id, links, note=None):
+        """Close NOW (user ruling: never wait on slow/absent requesters);
+        anyone can re-open. links = the node/edge/assertion ids that satisfy."""
+        identity, budget = self.authenticate(token)
+        self._check_budget(identity, budget)
+        if not links:
+            return {"rejected": {"rule": "REQ",
+                                 "message": "fulfillment must link what was "
+                                            "built (node/edge/assertion ids)"}}
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT status, requested_by FROM requests "
+                      "WHERE request_id=%s", (request_id,))
+            row = c.fetchone()
+            if not row:
+                return {"rejected": {"rule": "E404",
+                                     "message": f"request {request_id}?"}}
+            if row[0] != "open":
+                return {"rejected": {"rule": "REQ", "message": "already fulfilled"}}
+            requested_by = row[1]
+            c.execute("SELECT count(*) FROM request_endorsements "
+                      "WHERE request_id=%s", (request_id,))
+            endorsements = c.fetchone()[0]
+            c.execute("UPDATE requests SET status='fulfilled', fulfilled_by=%s, "
+                      "fulfilled_links=%s, fulfilled_at=now(), "
+                      "notes=COALESCE(%s, notes) WHERE request_id=%s",
+                      (Jsonb(identity), Jsonb(links), note, request_id))
+            pts = 3 + endorsements
+            c.execute("UPDATE identities SET points = points + %s "
+                      "WHERE identity->>'id' = %s", (pts, identity.get("id")))
+            c.execute("UPDATE identities SET points = points + 1 "
+                      "WHERE identity->>'id' = %s", (requested_by.get("id"),))
+        return {"fulfilled": request_id, "points_earned": pts}
+
+    def reopen_request(self, token, request_id, reason):
+        identity, _ = self.authenticate(token)
+        with self.pg.conn.cursor() as c:
+            c.execute("UPDATE requests SET status='open', "
+                      "notes = COALESCE(notes,'') || %s WHERE request_id=%s "
+                      "AND status='fulfilled' RETURNING request_id",
+                      (f"\n[re-opened by {identity.get('id')}: {reason}]",
+                       request_id))
+            row = c.fetchone()
+        if not row:
+            return {"rejected": {"rule": "REQ",
+                                 "message": "not found or not fulfilled"}}
+        return {"reopened": request_id}
+
+    def leaderboard(self, token, k=20):
+        self.authenticate(token)
+        with self.pg.conn.cursor() as c:
+            c.execute("SELECT identity->>'id', identity->>'type', points "
+                      "FROM identities WHERE points > 0 "
+                      "ORDER BY points DESC LIMIT %s", (k,))
+            return [{"id": i, "type": t, "points": p} for i, t, p in c.fetchall()]
+
     # -- internals -------------------------------------------------------------
     def _apply(self, identity, facts, notes):
         cr = self.pg.open_cr(proposer=identity)

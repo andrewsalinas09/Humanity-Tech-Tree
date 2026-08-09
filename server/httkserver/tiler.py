@@ -18,12 +18,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "backend"))
 
 import mapbox_vector_tile
-from fastapi import FastAPI, Response
+from fastapi import Body, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from httk import Store, View, realizable
 from httkdb.factlog import PgFactLog
 from httkserver.layout import compute_layout, importance, version_map
+from httkserver.service import Service
 
 EXTENT = 4096
 BUF = 256                     # tile buffer: geometry clipped server-side (px)
@@ -88,6 +89,16 @@ def _get_pg():
     if _pg is None:
         _pg = PgFactLog()
     return _pg
+
+
+_svc = None
+
+
+def _get_svc():
+    global _svc
+    if _svc is None:
+        _svc = Service(_get_pg())
+    return _svc
 
 
 def _state():
@@ -380,6 +391,34 @@ def search(q: str):
             hits.append({"node_id": n, "name": view.field(n, "name") or n,
                          "lng": p[0] if p else 0, "lat": p[1] if p else 0})
     return {"hits": hits[:10]}
+
+
+# -- requests (Bounties tab): thin REST proxy over the Service ---------------
+@app.get("/requests")
+def requests_list(status: str = "open", token: str = "tok-andrew"):
+    return _get_svc().list_requests(token, status)
+
+
+@app.post("/requests")
+def requests_post(body: dict = Body(...)):
+    token = body.pop("token", "tok-andrew")
+    return _get_svc().post_request(token, **body)
+
+
+@app.post("/requests/{request_id}/endorse")
+def requests_endorse(request_id: int, body: dict = Body(default={})):
+    return _get_svc().endorse_request(body.get("token", "tok-andrew"), request_id)
+
+
+@app.post("/requests/{request_id}/reopen")
+def requests_reopen(request_id: int, body: dict = Body(...)):
+    return _get_svc().reopen_request(body.get("token", "tok-andrew"),
+                                     request_id, body.get("reason", ""))
+
+
+@app.get("/leaderboard")
+def leaderboard(token: str = "tok-andrew"):
+    return _get_svc().leaderboard(token)
 
 
 # The trust visual language on a WHITE world (user ruling). Nodes render as

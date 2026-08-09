@@ -63,6 +63,50 @@ export default function Home() {
   const [seq, setSeq] = useState(0);
   const [tab, setTab] = useState("Explore");
   const [q, setQ] = useState("");
+  const [reqs, setReqs] = useState<any[]>([]);
+  const [board, setBoard] = useState<any[]>([]);
+  const [form, setForm] = useState({ want: "WANT_NODE", subject_node: "",
+                                     wanted_name: "", notes: "", sources: "" });
+
+  const loadRequests = async () => {
+    setReqs(await (await fetch(`${TILER}/requests?status=all`)).json());
+    setBoard(await (await fetch(`${TILER}/leaderboard`)).json());
+  };
+
+  const postRequest = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    const sources = form.sources.trim()
+      ? form.sources.split("\n").map((l) => {
+          const [source, locator] = l.split("|").map((s) => s.trim());
+          return { source, locator: locator ?? null };
+        }) : [];
+    const body: any = { want: form.want, notes: form.notes || null,
+                        offered_sources: sources };
+    if (form.want === "WANT_NODE") body.wanted_name = form.wanted_name;
+    else body.subject_node = form.subject_node;
+    const res = await (await fetch(`${TILER}/requests`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body) })).json();
+    if (res.rejected) alert(`${res.rejected.rule}: ${res.rejected.message}`);
+    else setForm({ ...form, wanted_name: "", subject_node: "", notes: "",
+                   sources: "" });
+    loadRequests();
+  };
+
+  const endorse = async (id: number) => {
+    await fetch(`${TILER}/requests/${id}/endorse`, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: "{}" });
+    loadRequests();
+  };
+
+  const reopen = async (id: number) => {
+    const reason = window.prompt("Why does this need re-opening?");
+    if (!reason) return;
+    await fetch(`${TILER}/requests/${id}/reopen`, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }) });
+    loadRequests();
+  };
   // version families the user has "demerged" — collapsed by default
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const expandedRef = useRef<Set<string>>(expanded);
@@ -269,7 +313,8 @@ export default function Home() {
     <div style={S.shell}>
       <header style={S.tabs}>
         {["Explore", "Bounties", "Tickets", "Changes"].map((t) => (
-          <button key={t} onClick={() => setTab(t)}
+          <button key={t}
+                  onClick={() => { setTab(t); if (t === "Bounties") loadRequests(); }}
                   style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
             {t}
           </button>
@@ -279,10 +324,88 @@ export default function Home() {
       </header>
       <main style={S.main}>
         <aside style={S.panel}>
-          {!card && <p style={{ opacity: 0.6 }}>Click a node — or search, upper
+          {tab === "Bounties" && (
+            <div>
+              <h3 style={{ margin: "0 0 8px" }}>Ask for something</h3>
+              <form onSubmit={postRequest}>
+                <select value={form.want}
+                        onChange={(e) => setForm({ ...form, want: e.target.value })}
+                        style={S.input}>
+                  <option value="WANT_NODE">Something should exist</option>
+                  <option value="WANT_COVERAGE">Flesh out a node's dependencies</option>
+                  <option value="WANT_EVIDENCE">A node needs citations</option>
+                </select>
+                {form.want === "WANT_NODE"
+                  ? <input placeholder="What should exist?" value={form.wanted_name}
+                           onChange={(e) => setForm({ ...form, wanted_name: e.target.value })}
+                           style={S.input} required />
+                  : <input placeholder="node id (e.g. transistor)" value={form.subject_node}
+                           onChange={(e) => setForm({ ...form, subject_node: e.target.value })}
+                           style={S.input} required />}
+                <textarea placeholder="Notes (why / what would make this good)"
+                          value={form.notes} rows={2}
+                          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                          style={S.input} />
+                <textarea placeholder={"Sources you already have, one per line:\nsource | locator"}
+                          value={form.sources} rows={2}
+                          onChange={(e) => setForm({ ...form, sources: e.target.value })}
+                          style={S.input} />
+                <button type="submit" style={S.solveBtn}>Post request</button>
+              </form>
+              <h3 style={{ margin: "16px 0 4px" }}>Queue</h3>
+              {reqs.length === 0 && <p style={{ opacity: 0.5 }}>No requests yet.</p>}
+              {reqs.map((r) => (
+                <div key={r.request} style={S.reqBox}>
+                  <div>
+                    <b>{r.wanted_name ?? r.subject_node}</b>{" "}
+                    <small style={{ opacity: 0.55 }}>
+                      {r.want.replace("WANT_", "").toLowerCase()}
+                      {" · by "}{r.requested_by?.id}
+                    </small>
+                  </div>
+                  {r.notes && <div style={{ fontSize: 12.5, opacity: 0.75,
+                                            whiteSpace: "pre-wrap" }}>{r.notes}</div>}
+                  {(r.offered_sources ?? []).length > 0 &&
+                    <div style={{ fontSize: 12, opacity: 0.65 }}>
+                      📎 {r.offered_sources.map((s: any) =>
+                            s.locator ? `${s.source} — ${s.locator}` : s.source)
+                          .join(" · ")}</div>}
+                  <div style={{ marginTop: 4 }}>
+                    {r.status === "open" ? (
+                      <button onClick={() => endorse(r.request)} style={S.miniBtn}>
+                        ▲ {r.endorsements}
+                      </button>
+                    ) : (
+                      <>
+                        <Chip ok label={`fulfilled by ${r.fulfilled_by?.id}`} />{" "}
+                        {(r.fulfilled_links ?? []).map((l: string) => (
+                          <span key={l} style={{ ...S.link, fontSize: 12,
+                                                 marginRight: 6 }}
+                                onClick={() => { setTab("Explore");
+                                  mapRef.current && focusOn(mapRef.current, l); }}>
+                            {l}
+                          </span>))}
+                        <button onClick={() => reopen(r.request)}
+                                style={S.miniBtn}>re-open</button>
+                      </>
+                    )}
+                  </div>
+                </div>))}
+              {board.length > 0 && (
+                <div>
+                  <h3 style={{ margin: "16px 0 4px" }}>Karma</h3>
+                  {board.map((b) => (
+                    <div key={b.id} style={{ fontSize: 13 }}>
+                      {b.points} · {b.id} <small style={{ opacity: 0.5 }}>{b.type}</small>
+                    </div>))}
+                </div>)}
+            </div>
+          )}
+          {tab !== "Bounties" && !card &&
+            <p style={{ opacity: 0.6 }}>Click a node — or search, upper
             right. Red ring = needs citation. Faded = nobody vouched yet.
             Everything builds from zero.</p>}
-          {card && !card.missing && (
+          {tab !== "Bounties" && card && !card.missing && (
             <div>
               {card.image_url &&
                 <img src={card.image_url} alt="" style={S.img} />}
@@ -407,6 +530,14 @@ const styles: Record<string, React.CSSProperties> = {
              color: "#8a93a3", marginBottom: 4 },
   orSep: { textAlign: "center", fontSize: 11, color: "#b0b8c6",
            margin: "2px 0" },
+  input: { display: "block", width: "100%", margin: "6px 0", padding: "7px 10px",
+           borderRadius: 8, border: "1px solid #cfd6e0", fontSize: 13,
+           background: "#fff", color: "#1b2432" },
+  reqBox: { border: "1px solid #e4e8ef", borderRadius: 10, padding: "8px 10px",
+            margin: "8px 0" },
+  miniBtn: { padding: "2px 10px", borderRadius: 8, border: "1px solid #cfd6e0",
+             background: "#f6f8fb", cursor: "pointer", fontSize: 12,
+             marginRight: 6 },
   solveBox: { padding: "10px 12px", borderRadius: 10, background: "#f6f8fb",
               border: "1px solid #e4e8ef", margin: "6px 0" },
   search: { position: "absolute", top: 12, right: 12, zIndex: 5 },

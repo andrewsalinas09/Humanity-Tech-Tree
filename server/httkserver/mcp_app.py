@@ -100,6 +100,45 @@ def build_app(pinned=None):
         tok = _cred(ctx, pinned)
         return svc.get_node(tok, node_id) if tok else _NO_CRED
 
+    @app.tool()
+    def post_request(want: str, ctx: Context, subject_node: str = None,
+                     wanted_name: str = None, wanted_description: str = None,
+                     notes: str = None, offered_sources: list = None) -> dict:
+        """Ask for graph work: WANT_NODE (something should exist),
+        WANT_COVERAGE (an existing node's dependencies are incomplete),
+        WANT_EVIDENCE (claims need citations). offered_sources are
+        citations-in-waiting: [{source, locator}]."""
+        tok = _cred(ctx, pinned)
+        return svc.post_request(tok, want, subject_node, wanted_name,
+                                wanted_description, notes,
+                                offered_sources) if tok else _NO_CRED
+
+    @app.tool()
+    def list_requests(ctx: Context, status: str = "open") -> list:
+        """The bounty queue, most-endorsed first (status: open|fulfilled|all)."""
+        tok = _cred(ctx, pinned)
+        return svc.list_requests(tok, status) if tok else [_NO_CRED]
+
+    @app.tool()
+    def endorse_request(request_id: int, ctx: Context) -> dict:
+        """Upvote a request — agents work the most-wanted first."""
+        tok = _cred(ctx, pinned)
+        return svc.endorse_request(tok, request_id) if tok else _NO_CRED
+
+    @app.tool()
+    def fulfill_request(request_id: int, links: list, ctx: Context,
+                        note: str = None) -> dict:
+        """Close a request NOW, linking the node/edge/assertion ids that satisfy
+        it. Earns karma (3 + endorsements). Anyone can re-open later."""
+        tok = _cred(ctx, pinned)
+        return svc.fulfill_request(tok, request_id, links, note) if tok else _NO_CRED
+
+    @app.tool()
+    def reopen_request(request_id: int, reason: str, ctx: Context) -> dict:
+        """Re-open a fulfilled request that missed the mark (say why)."""
+        tok = _cred(ctx, pinned)
+        return svc.reopen_request(tok, request_id, reason) if tok else _NO_CRED
+
     return app
 
 
