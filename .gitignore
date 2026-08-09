@@ -1,2 +1,7 @@
 .idea
 Chats
+node_modules/
+.next/
+server/tiler.log
+__pycache__/
+.pytest_cache/
