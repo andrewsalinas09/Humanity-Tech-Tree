@@ -135,8 +135,10 @@ def compute_layout(view):
     depth = _depths(view, nodes, vmap)
 
     lines = ["digraph httk {",
-             '  rankdir=TB; splines=true; nodesep=0.6; ranksep=1.1;',
-             '  node [shape=box, fixedsize=true, width=1.1, height=0.9,'
+             '  rankdir=TB; splines=true; nodesep=1.0; ranksep=1.1;',
+             # box ≈ the rendered book icon's world footprint, so splines
+             # stop just shy of the visible book (user: "almost touching")
+             '  node [shape=box, fixedsize=true, width=0.6, height=0.5,'
              ' label=""];']
     for n in nodes:
         lines.append(f"  {_dot_quote(n)};")
@@ -177,13 +179,37 @@ def compute_layout(view):
             lng, lat = world(x, y)
             pos[n] = (lng, lat, depth[n])
 
+    def _reach(path, center, r=0.55):
+        """Extend a path end to r degrees from the node center — edges render
+        UNDER icons, so a slight overshoot is invisible and the line reads as
+        almost touching the book (user ruling)."""
+        (px_, py_), (cx_, cy_) = path[-1], center
+        dx, dy = cx_ - px_, cy_ - py_
+        d = (dx * dx + dy * dy) ** 0.5
+        if d > r:
+            path.append((cx_ - dx / d * r, cy_ - dy / d * r))
+        return path
+
+    ends = {eid: eid for eid in edge_ids}
+    edge_ends = {}
+    for n in nodes:
+        for e in view.edges_out(n, None):
+            if e["edge_id"] in ends:
+                edge_ends[e["edge_id"]] = (n, e["to"])
     edge_paths = {}
     for e in doc.get("edges", []):
         eid = e.get("id")
         if eid and "pos" in e:
             pl = _spline_to_polyline(e["pos"])
             if len(pl) >= 2:
-                edge_paths[eid] = [world(x, y) for x, y in pl]
+                path = [world(x, y) for x, y in pl]
+                a, b = edge_ends.get(eid, (None, None))
+                if a in pos:
+                    path = list(reversed(_reach(list(reversed(path)),
+                                                pos[a][:2])))
+                if b in pos:
+                    path = _reach(path, pos[b][:2])
+                edge_paths[eid] = path
 
     # timeline cascade (user ruling): versions step down-and-right of their
     # family root at ~10°, ordered by date — a waterfall of generations
@@ -204,96 +230,7 @@ def layered_layout(view):
     """Positions only (compat wrapper over compute_layout)."""
     return compute_layout(view)[0]
 
-
-# ---------------------------------------------------------------------------
-# Corridor countries (GMap lineage): deterministic label-propagation clusters
-# over the constraint graph, drawn as padded hulls — regions instead of
-# inter-cluster edge ink.
-# ---------------------------------------------------------------------------
-
-def clusters(view):
-    """{node: cluster_label} via deterministic label propagation on the
-    undirected hard+taxonomy graph (min-label tie-break, fixed sweep order)."""
-    vmap = version_map(view)
-    nodes = sorted(n for n in view.nodes() if n not in vmap)
-    neigh = {n: set() for n in nodes}
-    for n in nodes:
-        for e in view.edges_in(n, HARD_TYPES | TAXONOMY_TYPES):
-            if e["from"] in neigh:
-                neigh[n].add(e["from"]); neigh[e["from"]].add(n)
-    label = {n: n for n in nodes}
-    for _ in range(30):
-        changed = False
-        for n in nodes:
-            if not neigh[n]:
-                continue
-            counts = {}
-            for m in neigh[n]:
-                counts[label[m]] = counts.get(label[m], 0) + 1
-            best = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
-            if best != label[n] and counts[best] > counts.get(label[n], 0):
-                label[n] = best
-                changed = True
-        if not changed:
-            break
-    # versions belong to their family's country
-    for v, (fam, _) in vmap.items():
-        if fam in label:
-            label[v] = label[fam]
-    return label
-
-
-def _hull(points):
-    """Andrew's monotone chain convex hull."""
-    pts = sorted(set(points))
-    if len(pts) <= 2:
-        return pts
-
-    def cross(o, a, b):
-        return (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0])
-    lo, hi = [], []
-    for p in pts:
-        while len(lo) >= 2 and cross(lo[-2], lo[-1], p) <= 0:
-            lo.pop()
-        lo.append(p)
-    for p in reversed(pts):
-        while len(hi) >= 2 and cross(hi[-2], hi[-1], p) <= 0:
-            hi.pop()
-        hi.append(p)
-    return lo[:-1] + hi[:-1]
-
-
-def regions(view, pos, imp):
-    """Country polygons: per cluster (≥2 members placed), a convex hull
-    padded outward — plus a name from the most important member."""
-    label = clusters(view)
-    groups = {}
-    for n, lab in label.items():
-        if n in pos:
-            groups.setdefault(lab, []).append(n)
-    out = []
-    for i, (lab, members) in enumerate(sorted(groups.items())):
-        if len(members) < 2:
-            continue
-        pts = [(pos[n][0], pos[n][1]) for n in members]
-        hull = _hull(pts)
-        if len(hull) < 3:                  # 2 nodes → capsule rectangle
-            (x1, y1), (x2, y2) = pts[0], pts[-1]
-            dx, dy = x2 - x1, y2 - y1
-            L = (dx*dx + dy*dy) ** 0.5 + 1e-9
-            nx, ny = -dy / L * 4.5, dx / L * 4.5
-            hull = [(x1+nx, y1+ny), (x2+nx, y2+ny),
-                    (x2-nx, y2-ny), (x1-nx, y1-ny)]
-        cxp = sum(p[0] for p in hull) / len(hull)
-        cyp = sum(p[1] for p in hull) / len(hull)
-        pad = []
-        for (x, y) in hull:
-            dx, dy = x - cxp, y - cyp
-            d = (dx*dx + dy*dy) ** 0.5 + 1e-9
-            grow = 6.0 + 0.35 * d          # proportional padding, min 6°
-            pad.append((x + dx / d * grow, y + dy / d * grow))
-        top = max(members, key=lambda n: (imp.get(n, 0), n))
-        out.append({"polygon": pad,
-                    "name": view.field(top, "name") or top,
-                    "tint": i % 6, "members": sorted(members)})
-    return out
+# Corridor-country polygons were tried and REJECTED by the user (2026-08-09,
+# "it looks bad") — the crude padded-hull version, at least. If countries
+# return, do them properly: GMap Voronoi-merge with seas/lakes (git has the
+# first attempt).

@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from httk import Store, View, realizable
 from httkdb.factlog import PgFactLog
-from httkserver.layout import compute_layout, importance, version_map, regions
+from httkserver.layout import compute_layout, importance, version_map
 
 EXTENT = 4096
 BUF = 256                     # tile buffer: geometry clipped server-side (px)
@@ -75,43 +75,6 @@ def _clip_polyline(pts, lo, hi):
     return runs
 
 
-def _clip_polygon(pts, lo, hi):
-    """Sutherland–Hodgman clip of a polygon ring to the box."""
-    def clip_edge(poly, inside, isect):
-        out = []
-        for i, cur in enumerate(poly):
-            prev = poly[i - 1]
-            if inside(cur):
-                if not inside(prev):
-                    out.append(isect(prev, cur))
-                out.append(cur)
-            elif inside(prev):
-                out.append(isect(prev, cur))
-        return out
-
-    def x_isect(x):
-        def f(p, q):
-            t = (x - p[0]) / (q[0] - p[0])
-            return (x, p[1] + t * (q[1] - p[1]))
-        return f
-
-    def y_isect(y):
-        def f(p, q):
-            t = (y - p[1]) / (q[1] - p[1])
-            return (p[0] + t * (q[0] - p[0]), y)
-        return f
-
-    poly = list(pts)
-    for inside, isect in (
-            (lambda p: p[0] >= lo, x_isect(lo)),
-            (lambda p: p[0] <= hi, x_isect(hi)),
-            (lambda p: p[1] >= lo, y_isect(lo)),
-            (lambda p: p[1] <= hi, y_isect(hi))):
-        poly = clip_edge(poly, inside, isect)
-        if len(poly) < 3:
-            return []
-    return poly
-
 app = FastAPI(title="httk-tiler")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
@@ -138,9 +101,19 @@ def _state():
         view = View(store)
         pos, paths = compute_layout(view)
         imp = importance(view)
+        vmap = version_map(view)
+        # map-style LOD (user ruling): less important books DISAPPEAR as you
+        # zoom out — GraphMaps monotone persistence. Versions auto-tuck (they
+        # are the deepest tier; manual demerge overrides at any zoom).
+        zmin = {}
+        for n in pos:
+            if n in vmap:
+                zmin[n] = 6
+            else:
+                r = imp.get(n, 0.0)
+                zmin[n] = 0 if r >= 0.95 else 3 if r >= 0.6 else 4
         _cache.update(seq=seq, store=store, view=view, pos=pos, paths=paths,
-                      imp=imp, vmap=version_map(view),
-                      regions=regions(view, pos, imp))
+                      imp=imp, vmap=vmap, zmin=zmin)
     return _cache
 
 
@@ -192,27 +165,9 @@ def tile(z: int, x: int, y: int):
                 "rank": round(st["imp"].get(n, 0.0), 3),   # hub..leaf (airport map)
                 "version": n in st["vmap"],                # satellite (collapsible)
                 "family": st["vmap"].get(n, (None,))[0] or "",
+                "zmin": st["zmin"].get(n, 0),              # map LOD tier
             },
         })
-    region_feats = []
-    for r in st["regions"]:
-        ring = [_lnglat_to_tilepx(lng, lat, z, x, y) for lng, lat in r["polygon"]]
-        clipped = _clip_polygon(ring, -BUF, EXTENT + BUF)
-        if clipped:
-            region_feats.append({
-                "geometry": {"type": "Polygon",
-                             "coordinates": [[list(p) for p in clipped]
-                                             + [list(clipped[0])]]},
-                "properties": {"name": r["name"], "tint": r["tint"]}})
-        # label point rides in the tile holding the region centroid
-        cx = sum(p[0] for p in r["polygon"]) / len(r["polygon"])
-        cy = sum(p[1] for p in r["polygon"]) / len(r["polygon"])
-        px_, py_ = _lnglat_to_tilepx(cx, cy, z, x, y)
-        if 0 <= px_ < EXTENT and 0 <= py_ < EXTENT:
-            region_feats.append({
-                "geometry": {"type": "Point", "coordinates": [px_, py_]},
-                "properties": {"name": r["name"], "tint": r["tint"],
-                               "label": True}})
     for e in view._edges.values():
         a, b = pos.get(e["from"]), pos.get(e["to"])
         if not a or not b:
@@ -234,10 +189,11 @@ def tile(z: int, x: int, y: int):
                                                  st["imp"].get(e["to"], 0)), 3),
                                "vfamily": (st["vmap"].get(e["from"], (None,))[0]
                                            or st["vmap"].get(e["to"], (None,))[0]
-                                           or "")},
+                                           or ""),
+                               "ezmin": max(st["zmin"].get(e["from"], 0),
+                                            st["zmin"].get(e["to"], 0))},
             })
     data = mapbox_vector_tile.encode([
-        {"name": "regions", "features": region_feats},
         {"name": "edges", "features": edges_feats},
         {"name": "nodes", "features": nodes_feats},
     ], default_options={"extents": EXTENT})
@@ -327,12 +283,20 @@ def search(q: str):
 DIM = ["case", ["boolean", ["feature-state", "dim"], False]]
 
 # Edges: FAINT AT REST, VIVID ON FOCUS (user ruling, 2026-08-09 — the
-# unanimous production graph-map pattern). 'lit' = in the focused closure.
+# unanimous production graph-map pattern). 'lit' = in the focused closure;
+# 'dim' stays at rest-faint (user: other paths still faint, not gone).
 def _edge_state(lit, dim, rest):
     return ["case",
             ["boolean", ["feature-state", "lit"], False], lit,
             ["boolean", ["feature-state", "dim"], False], dim,
             rest]
+
+
+# Map LOD (user ruling): importance tiers appear as you zoom in, like a map;
+# versions are the deepest tier (auto-tuck out, auto-untuck in). The viewer
+# re-composes these with the manual demerge override.
+SHOW_NODE = ["<=", ["get", "zmin"], ["zoom"]]
+SHOW_EDGE = ["<=", ["get", "ezmin"], ["zoom"]]
 
 
 @app.get("/style.json")
@@ -356,31 +320,16 @@ def style():
         "layers": [
             {"id": "bg", "type": "background",
              "paint": {"background-color": "#ffffff"}},
-            {"id": "regions", "type": "fill", "source": "httk",
-             "source-layer": "regions", "filter": ["!", ["has", "label"]],
-             "paint": {"fill-color": ["match", ["get", "tint"],
-                                      0, "#eef3fa", 1, "#f0f7ee", 2, "#faf3ec",
-                                      3, "#f5eef7", 4, "#eef7f6", "#f7f2ec"],
-                       "fill-opacity": 0.8,
-                       "fill-outline-color": "#dde4ee"}},
-            {"id": "region-labels", "type": "symbol", "source": "httk",
-             "source-layer": "regions", "filter": ["has", "label"],
-             "layout": {"text-field": ["get", "name"],
-                        "text-size": ["interpolate", ["linear"], ["zoom"],
-                                      1, 14, 5, 26],
-                        "text-transform": "uppercase",
-                        "text-letter-spacing": 0.32,
-                        "text-optional": True},
-             "paint": {"text-color": "#a9b4c4", "text-opacity": 0.75,
-                       "text-halo-color": "#ffffff", "text-halo-width": 1.2}},
             {"id": "edges-ghost", "type": "line", "source": "httk",
-             "source-layer": "edges", "filter": ["get", "ghost"],
+             "source-layer": "edges",
+             "filter": ["all", ["get", "ghost"], SHOW_EDGE],
              "layout": {"line-cap": "round"},
              "paint": {"line-color": "#b8aecb", "line-width": 1.0,
                        "line-opacity": _edge_state(0.6, 0.03, 0.08),
                        "line-dasharray": ["literal", [1, 3]]}},
             {"id": "edges-casing", "type": "line", "source": "httk",
-             "source-layer": "edges", "filter": ["!", ["get", "ghost"]],
+             "source-layer": "edges",
+             "filter": ["all", ["!", ["get", "ghost"]], SHOW_EDGE],
              "layout": {"line-cap": "round", "line-join": "round"},
              "paint": {"line-color": "#ffffff",
                        "line-width": ["interpolate", ["linear"], ["zoom"],
@@ -388,7 +337,7 @@ def style():
                                       8, ["+", 4.4, ["*", 2.6, ["get", "rank"]]]],
                        "line-opacity": _edge_state(0.95, 0.0, 0.0)}},
             {"id": "edges", "type": "line", "source": "httk", "source-layer": "edges",
-             "filter": ["!", ["get", "ghost"]],
+             "filter": ["all", ["!", ["get", "ghost"]], SHOW_EDGE],
              "layout": {"line-cap": "round", "line-join": "round"},
              "paint": {"line-color": ["case",
                                       ["boolean", ["feature-state", "lit"], False],
@@ -405,18 +354,19 @@ def style():
                                           1.2,
                                           ["+", 1.4, ["*", 1.8, ["get", "rank"]]])],
                        "line-opacity": _edge_state(
-                           0.95, 0.04,
+                           0.95, 0.09,
                            ["+", 0.10, ["*", 0.10, ["get", "rank"]]]),
                        "line-dasharray": ["case", ["get", "shadowed"],
                                           ["literal", [2, 2]], ["literal", [1, 0]]]}},
             {"id": "node-ring", "type": "symbol", "source": "httk",
-             "source-layer": "nodes", "filter": ["!", ["get", "cited"]],
+             "source-layer": "nodes",
+             "filter": ["all", ["!", ["get", "cited"]], SHOW_NODE],
              "layout": {"icon-image": "book-ring", "icon-size": ["step", ["get", "rank"], 0.75, 0.6, 1.0, 0.95, 1.5],
                         "icon-allow-overlap": True,
                         "symbol-sort-key": ["-", 1, ["get", "rank"]]},
              "paint": {"icon-opacity": [*DIM, 0.3, 1.0]}},
             {"id": "nodes", "type": "symbol", "source": "httk",
-             "source-layer": "nodes",
+             "source-layer": "nodes", "filter": SHOW_NODE,
              "layout": {"icon-image": "book", "icon-size": ["step", ["get", "rank"], 0.75, 0.6, 1.0, 0.95, 1.5],  # 3 tiers
                         "icon-allow-overlap": True,
                         "symbol-sort-key": ["-", 1, ["get", "rank"]],  # hubs' labels win

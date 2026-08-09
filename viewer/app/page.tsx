@@ -60,10 +60,13 @@ export default function Home() {
   const applyExpand = (map: maplibregl.Map, fams: Set<string>) => {
     if (!map.getLayer("nodes")) return;
     const list = ["literal", [...fams]] as any;
-    const showNode = ["any", ["!", ["get", "version"]],
+    // zoom LOD (map-style: tiers appear as you zoom; versions auto-tuck)
+    // OR-composed with the manual demerge override for expanded families
+    const showNode = ["any", ["<=", ["get", "zmin"], ["zoom"]],
                       ["in", ["get", "family"], list]] as any;
-    const showEdge = ["any", ["==", ["get", "vfamily"], ""],
-                      ["in", ["get", "vfamily"], list]] as any;
+    const showEdge = ["any", ["<=", ["get", "ezmin"], ["zoom"]],
+                      ["all", ["!=", ["get", "vfamily"], ""],
+                       ["in", ["get", "vfamily"], list]]] as any;
     map.setFilter("nodes", showNode);
     map.setFilter("node-ring", ["all", ["!", ["get", "cited"]], showNode]);
     map.setFilter("edges", ["all", ["!", ["get", "ghost"]], showEdge]);
