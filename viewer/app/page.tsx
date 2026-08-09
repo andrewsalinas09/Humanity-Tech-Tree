@@ -116,9 +116,15 @@ export default function Home() {
       if (selRef.current) applyDim(map, selRef.current);
     });
 
+    let fitted = false;
     const poll = setInterval(async () => {
       try {
-        const { seq: s } = await (await fetch(`${TILER}/changes`)).json();
+        const { seq: s, bounds } = await (await fetch(`${TILER}/changes`)).json();
+        if (!fitted && bounds) {                 // land on the content, not the ocean
+          fitted = true;
+          map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
+                        { padding: 90, duration: 800 });
+        }
         if (s !== seqRef.current) {
           seqRef.current = s; setSeq(s);
           (map.getSource("httk") as maplibregl.VectorTileSource)

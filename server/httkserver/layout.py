@@ -38,6 +38,9 @@ def layered_layout(view):
         layers.setdefault(ly, []).append(n)
     max_layer = max(layers) if layers else 0
 
+    edge_pairs = [(e["from"], e["to"]) for n in nodes
+                  for e in view.edges_in(n, HARD_TYPES | TAXONOMY_TYPES)]
+
     pos = {}
     for ly in sorted(layers):
         # barycenter of providers' x (previous layers already placed)
@@ -56,4 +59,41 @@ def layered_layout(view):
             lat = LAT_MAX if max_layer == 0 else (
                 LAT_MAX - (LAT_MAX - LAT_MIN) * ly / max_layer)
             pos[n] = (max(LNG_MIN, min(LNG_MAX, lng)), lat, ly)
-    return pos
+    return _relax(pos, edge_pairs)
+
+
+def _relax(pos, edges, iters=260):
+    """Organic settling (user ruling: 'nodes automatically move out of the way').
+    Deterministic force relaxation: pairwise repulsion + edge springs + a soft
+    anchor to each node's altitude band, so the up/down MEANING survives while
+    the rigidity dies. O(n²) per step — fine at dev scale; spatial hashing when
+    corridors multiply."""
+    ids = sorted(pos)
+    P = {n: [pos[n][0], pos[n][1]] for n in ids}
+    anchor = {n: pos[n][1] for n in ids}
+    for it in range(iters):
+        F = {n: [0.0, 0.0] for n in ids}
+        for i, a in enumerate(ids):                      # repulsion (bodies!)
+            for b in ids[i + 1:]:
+                dx, dy = P[a][0] - P[b][0], P[a][1] - P[b][1]
+                d2 = dx * dx + dy * dy + 0.01
+                if d2 < 625:                             # only near neighbors
+                    d = d2 ** 0.5
+                    f = 90.0 / d2
+                    F[a][0] += f * dx / d; F[a][1] += f * dy / d
+                    F[b][0] -= f * dx / d; F[b][1] -= f * dy / d
+        for u, v in edges:                               # springs (kinship)
+            if u not in P or v not in P:
+                continue
+            dx, dy = P[v][0] - P[u][0], P[v][1] - P[u][1]
+            d = (dx * dx + dy * dy) ** 0.5 + 1e-6
+            f = 0.018 * (d - 13.0)
+            F[u][0] += f * dx / d; F[u][1] += f * dy / d
+            F[v][0] -= f * dx / d; F[v][1] -= f * dy / d
+        for n in ids:                                    # altitude still means
+            F[n][1] += 0.10 * (anchor[n] - P[n][1])
+        step = 0.55 * (1 - it / iters) + 0.04
+        for n in ids:
+            P[n][0] = max(LNG_MIN, min(LNG_MAX, P[n][0] + step * F[n][0]))
+            P[n][1] = max(LAT_MIN, min(LAT_MAX, P[n][1] + step * F[n][1]))
+    return {n: (P[n][0], P[n][1], pos[n][2]) for n in ids}

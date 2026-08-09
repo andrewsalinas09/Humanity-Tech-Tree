@@ -137,7 +137,11 @@ def _cited(view, node_id):
 
 @app.get("/changes")
 def changes():
-    return {"seq": _state()["seq"]}
+    st = _state()
+    lngs = [p[0] for p in st["pos"].values()] or [0]
+    lats = [p[1] for p in st["pos"].values()] or [0]
+    return {"seq": st["seq"],
+            "bounds": [min(lngs) - 6, min(lats) - 6, max(lngs) + 6, max(lats) + 6]}
 
 
 @app.get("/tiles/{z}/{x}/{y}.mvt")
