@@ -280,3 +280,195 @@ def set_constraint(view, edge_id, attr, op, value, class_="FITNESS", citation=No
     cons.append({"attr": attr, "op": op, "value": value, "class": class_})
     return StagedFacts([("assert", {"subject": edge_id, "field": "constraints",
                                     "value": cons})])
+
+
+# ================= texture verbs (every schema field is authorable) ==========
+
+def set_attribute(view, node_id, attr, value):
+    """Declare a node's attribute value (ADR-0004). Name canonicalization is the
+    Q-20 gate's job upstream; the compiler is mechanical."""
+    return StagedFacts([("assert", {"subject": node_id,
+                                    "field": f"attrs.{attr}", "value": value})])
+
+
+def add_time_segment(view, node_id, region, segment):
+    """Regional timeline segment {status, start, end?, reason?} (H3/TB-004).
+    ACTIVE/LOST overlap is legal but flags a region-decomposition bounty."""
+    key = f"timeline.{region}"
+    tl = list(view.field(node_id, key, []) or [])
+    tl.append(segment)
+    notes = []
+    for a in tl:
+        for b in tl:
+            if (a is not b and {a["status"], b["status"]} == {"ACTIVE", "LOST"}
+                    and a["start"] <= b.get("end", 1e9)
+                    and b["start"] <= a.get("end", 1e9)):
+                notes.append(f"H3: ACTIVE/LOST overlap in {region} — "
+                             "region-decomposition bounty")
+    return StagedFacts([("assert", {"subject": node_id, "field": key, "value": tl})],
+                       sorted(set(notes)))
+
+
+def date_edge(view, edge_id, start=None, end=None):
+    facts = []
+    if start is not None:
+        facts.append(("assert", {"subject": edge_id, "field": "start_date",
+                                 "value": start}))
+    if end is not None:
+        facts.append(("assert", {"subject": edge_id, "field": "end_date",
+                                 "value": end}))
+    return StagedFacts(facts)
+
+
+def add_iteration(view, family, record):
+    """ProductIteration data record (ADR-0009): {name, year, key_feature, tech_ids?}."""
+    recs = list(view.field(family, "iterations", []) or [])
+    if any(r["name"] == record["name"] for r in recs):
+        return Rejection("ADR-0009", f"iteration '{record['name']}' already recorded")
+    recs.append(record)
+    return StagedFacts([("assert", {"subject": family, "field": "iterations",
+                                    "value": recs})])
+
+
+def lift_iteration(view, family, record_name, node_id=None):
+    """The ADR-0018 §4 lifting operation: record → version node + edges.
+    A pure resolution increase — the record's claims become graph structure."""
+    recs = list(view.field(family, "iterations", []) or [])
+    hit = next((r for r in recs if r["name"] == record_name), None)
+    if hit is None:
+        return Rejection("ADR-0018", f"no iteration record '{record_name}' on {family}")
+    fam = view.node(family)
+    nid = node_id or record_name.lower().replace(" ", "-").replace(".", "-")
+    facts = [
+        ("node.create", {"node_id": nid,
+                         "category": fam["category"] if fam else "TECHNOLOGY"}),
+        ("assert", {"subject": nid, "field": "validity", "value": "current_truth"}),
+        ("edge.create", {"edge_id": f"r_{nid}_{family}", "from": nid, "to": family,
+                         "type": "IS_REFINEMENT_OF", "qualifier": None}),
+    ]
+    if hit.get("year") is not None:
+        facts.append(("assert", {"subject": f"r_{nid}_{family}", "field": "start_date",
+                                 "value": {"year": hit["year"], "unc": 0.5}}))
+    for t in hit.get("tech_ids", []):
+        facts.append(("edge.create", {"edge_id": f"e_{t}_{nid}", "from": t,
+                                      "to": nid, "type": "IS_COMPONENT_OF",
+                                      "qualifier": None}))
+    remaining = [r for r in recs if r["name"] != record_name]
+    facts.append(("assert", {"subject": family, "field": "iterations",
+                             "value": remaining}))
+    return StagedFacts(facts, [f"lifted '{record_name}' → node {nid} (record→edges, "
+                               "monotone resolution increase)"])
+
+
+def rename(view, node_id, new_name, year=None):
+    """Rebrand (ADR-0022): dated name_history; old name survives as an alias."""
+    old = view.field(node_id, "name")
+    hist = list(view.field(node_id, "name_history", []) or [])
+    if hist and "end" not in hist[-1] and year is not None:
+        hist[-1] = {**hist[-1], "end": year}
+    hist.append({"name": new_name, "start": year})
+    aliases = sorted(set((view.field(node_id, "aliases", []) or [])
+                         + ([old] if old else [])))
+    return StagedFacts([
+        ("assert", {"subject": node_id, "field": "name", "value": new_name}),
+        ("assert", {"subject": node_id, "field": "name_history", "value": hist}),
+        ("assert", {"subject": node_id, "field": "aliases", "value": aliases}),
+    ])
+
+
+def add_alias(view, node_id, alias):
+    aliases = sorted(set((view.field(node_id, "aliases", []) or []) + [alias]))
+    return StagedFacts([("assert", {"subject": node_id, "field": "aliases",
+                                    "value": aliases})])
+
+
+def reclassify(view, node_id, new_category, justification=""):
+    """Category is a correctable claim, not frozen identity. Deterministic check:
+    existing edges that would violate linters under the new category are flagged."""
+    notes = [f"reclassify justified: {justification}"]
+    if new_category in PEOPLE_ORGS:
+        bad = [e["edge_id"] for e in view.edges_out(node_id,
+               {"IS_COMPONENT_OF", "IS_INGREDIENT_OF"})]
+        if bad:
+            notes.append(f"L5 conflicts under new category — review: {bad}")
+    return StagedFacts([("assert", {"subject": node_id, "field": "category",
+                                    "value": new_category})], notes)
+
+
+def retract_assertion(view, assertion_id, justification=""):
+    """Spurious claim, no replacement: forward-fact retraction (ADR-0011)."""
+    return StagedFacts([("retract", {"target": assertion_id})],
+                       [f"retraction: {justification}"])
+
+
+def mark_shadowed(view, edge_id, covering, confirmation=""):
+    """Human-confirmed resolution of the L8 redundancy linter (ADR-0021/TB-025)."""
+    if view.edge(edge_id) is None:
+        return Rejection("E404", f"edge {edge_id} unknown")
+    missing = [c for c in covering if view.edge(c) is None]
+    if missing or not covering:
+        return Rejection("ADR-0021", f"covering edges missing/empty: {missing}")
+    return StagedFacts([("assert", {"subject": edge_id, "field": "shadowed_by",
+                                    "value": list(covering)})],
+                       [f"coverage human-confirmed (L8): {confirmation}"])
+
+
+def add_alternative_bundle(view, consumer, alternative_to, parts):
+    """TB-021's shape: an OR branch that is an AND of several new edges
+    ('palladium + heat' as one option against 'platinum')."""
+    alt = view.edge(alternative_to)
+    if alt is None or alt["to"] != consumer:
+        return Rejection("ADR-0017", f"{alternative_to} is not an edge into {consumer}")
+    facts, leaf_ids = [], []
+    for p in parts:
+        if _cat(view, p["provider"]) in PEOPLE_ORGS and p["type"] != "ENABLES":
+            return Rejection("L5", f"{p['provider']} is a person/org — never a part")
+        eid = p.get("edge_id") or f"e_{p['provider']}_{consumer}"
+        facts.append(("edge.create", {"edge_id": eid, "from": p["provider"],
+                                      "to": consumer, "type": p["type"],
+                                      "qualifier": None}))
+        leaf_ids.append(eid)
+    branch = (["edge", leaf_ids[0]] if len(leaf_ids) == 1
+              else ["and", *(["edge", e] for e in leaf_ids)])
+    expr = view.field(consumer, "requirement_expr")
+    expr = (["or", ["edge", alternative_to], branch] if expr is None
+            else ["or", expr, branch])
+    facts.append(("assert", {"subject": consumer, "field": "requirement_expr",
+                             "value": expr}))
+    return StagedFacts(facts)
+
+
+def move_assertion(store, view, assertion_id, new_subject, justification=""):
+    """Un-merge triage resolution 'move': re-home a claim (new assert + retract old)."""
+    src = next((f for f in store.facts
+                if f["fact_id"] == assertion_id and f["kind"] == "assert"), None)
+    if src is None:
+        return Rejection("E404", f"assertion {assertion_id} unknown")
+    b = src["body"]
+    return StagedFacts([
+        ("assert", {"subject": new_subject, "field": b["field"], "value": b["value"]}),
+        ("retract", {"target": assertion_id}),
+    ], [f"moved {b['field']} from {b['subject']} → {new_subject}: {justification}"])
+
+
+def park_assertion(store, view, assertion_id, ancestor, justification=""):
+    """Un-merge triage 'park' (H5c): re-home at a coarser-but-true ancestor,
+    flagged as a bounty — never forced into a possibly-false home."""
+    r = move_assertion(store, view, assertion_id, ancestor, justification)
+    if isinstance(r, StagedFacts):
+        flags = list(view.field(ancestor, "flags", []) or [])
+        flags.append({"kind": "parked-claim", "assertion": assertion_id,
+                      "note": justification})
+        r.facts.append(("assert", {"subject": ancestor, "field": "flags",
+                                   "value": flags}))
+        r.notes.append("parked: resolution bounty open (H5c)")
+    return r
+
+
+def flag(view, subject, grounds):
+    """The bounty entry point: mark anything as needing attention (README's
+    original gameplay; ADR-0025 §6 absurd-trace diagnosis lands here too)."""
+    flags = list(view.field(subject, "flags", []) or [])
+    flags.append({"grounds": grounds})
+    return StagedFacts([("assert", {"subject": subject, "field": "flags",
+                                    "value": flags})])

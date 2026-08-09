@@ -117,7 +117,13 @@ class View:
 
     # -- identities ----------------------------------------------------------
     def node(self, node_id):
-        return self._nodes.get(node_id)
+        n = self._nodes.get(node_id)
+        if n is None:
+            return None
+        # category is CORRECTABLE (reclassify verb): a later field assertion wins
+        # over the create-body value (the create body is just the initial claim).
+        cat = self.field(node_id, "category")
+        return {**n, "category": cat} if cat else n
 
     def edge(self, edge_id):
         return self._edges.get(edge_id)

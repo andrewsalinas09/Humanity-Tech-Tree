@@ -29,6 +29,9 @@ Doc system built; 10k lines of old chats distilled into ADRs, open questions, di
 - Constraint pruning, modifier stacks, state-as-query, optimization paths, impact analysis (ADR-0002/0003/0004/0006).
 - The old ADR-0014 "God Mode"/Golden Spike ideas live here.
 
+## Standing practice — the hardening loop (user ruling, 2026-08-08)
+This is an architecture + scale problem: most remaining gaps will surface through USE, not review. So: (1) build and use privately; (2) run agent red-teams in developer mode continuously against the RUNNING system (the stress-test workflow pointed at software, hunting the most esoteric breakage); (3) every find becomes a TESTBED case + kernel test before it's forgotten; (4) only when the esoteric well runs dry, scale up and open to the public. The system climbs its own verification ladder.
+
 ## Phase 5 — Scale
 - Storage engine decision at real data volumes (Q-17; ~TB-scale estimate), ingestion generators (Q-11), embedding services, LOD (Q-15), transitive-redundancy maintenance (Q-06).
 - Community launch: bounty/flag gameplay on the home page.

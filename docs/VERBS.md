@@ -66,6 +66,24 @@ H5: compiles the forward-edit redirect reversal. Then computes the triage set: a
 
 ---
 
+## Texture & data verbs (every schema field is authorable — user ruling)
+
+| Verb | Compiles to | Notes |
+|---|---|---|
+| `set_attribute(node, attr, value)` | attribute declaration (ADR-0004) | name passes the canonicalization gate upstream |
+| `add_time_segment(node, region, seg)` | regional timeline segment | ACTIVE/LOST overlap flags the H3 bounty (never rejects) |
+| `date_edge(edge, start?, end?)` | edge date assertions | also date params on edge verbs |
+| `add_iteration(family, record)` | ProductIteration record (ADR-0009) | duplicate names rejected |
+| `lift_iteration(family, name, node_id?)` | **the ADR-0018 §4 lifting operation**: version node + IS_REFINEMENT_OF (dated) + tech edges; record removed | monotone resolution increase |
+| `rename(node, new_name, year?)` | name + dated name_history + old-name alias (ADR-0022) | |
+| `add_alias(node, alias)` | alias union | |
+| `reclassify(node, category, justification)` | category correction — category is a claim, not frozen identity | linter conflicts under the new category are flagged for review |
+| `retract_assertion(assertion, justification)` | forward-fact retraction (ADR-0011) | |
+| `mark_shadowed(edge, covering[], confirmation)` | human-confirmed L8 resolution (ADR-0021/TB-025) | covering edges must exist; never deletes |
+| `add_alternative_bundle(consumer, alternative_to, parts[])` | **the TB-021 shape**: OR branch that is an AND of new edges ("palladium + heat" vs "platinum") | L5 checks per part |
+| `move_assertion(assertion, new_subject)` / `park_assertion(assertion, ancestor)` | un-merge triage resolutions (H5) — park flags the H5c bounty | |
+| `flag(subject, grounds)` | the bounty entry point (absurd traces, mistakes — the original README gameplay) | |
+
 ## The invariant this catalog enforces
 
 **Nothing a caller can express compiles to invalid structure.** Direction lives in verb names; legality lives in computed checks; genuine judgment lives in Decisions whose option sets are machine-complete. A malicious or ignorant caller's worst case is wrong-but-legal *content* — which is exactly what the moderation, verification, and bounty machinery exists to catch.
