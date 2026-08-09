@@ -154,8 +154,10 @@ class Service:
         if n is None:
             return {"missing": node_id}
         return {"node": n,
-                "fields": {k[1]: v[1] for k, v in view._fields.items()
-                           if k[0] == node_id},
+                # assertion ids ride along — attach_citation targets ASSERTIONS
+                # (ADR-0038); without these an MCP agent could never cite
+                "fields": {k[1]: {"value": v[1], "assertion": v[0]}
+                           for k, v in view._fields.items() if k[0] == node_id},
                 "edges_in": view.edges_in(node_id),
                 "edges_out": view.edges_out(node_id)}
 
