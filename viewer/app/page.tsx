@@ -67,6 +67,7 @@ export default function Home() {
     map.setFilter("nodes", showNode);
     map.setFilter("node-ring", ["all", ["!", ["get", "cited"]], showNode]);
     map.setFilter("edges", ["all", ["!", ["get", "ghost"]], showEdge]);
+    map.setFilter("edges-casing", ["all", ["!", ["get", "ghost"]], showEdge]);
     map.setFilter("edges-ghost", ["all", ["get", "ghost"], showEdge]);
   };
 
@@ -83,7 +84,9 @@ export default function Home() {
   };
 
   const applyDim = async (map: maplibregl.Map, id: string) => {
-    // full dependency closure, all the way up and all the way down
+    // full dependency closure, all the way up and all the way down.
+    // Edges are FAINT AT REST — focus LIGHTS the closure's threads vivid
+    // while everything else recedes (user ruling 2026-08-09).
     const cl = await (await fetch(`${TILER}/closure/${id}`)).json();
     const nodes = new Set<string>(cl.nodes), edges = new Set<string>(cl.edges);
     clearDim(map);
@@ -95,9 +98,9 @@ export default function Home() {
     }
     for (const f of map.querySourceFeatures("httk", { sourceLayer: "edges" })) {
       const eid = f.properties?.edge_id;
-      if (eid && !edges.has(eid))
-        map.setFeatureState({ source: "httk", sourceLayer: "edges", id: eid },
-                            { dim: true });
+      if (!eid) continue;
+      map.setFeatureState({ source: "httk", sourceLayer: "edges", id: eid },
+                          edges.has(eid) ? { lit: true } : { dim: true });
     }
   };
 

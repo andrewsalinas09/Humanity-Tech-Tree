@@ -1,17 +1,35 @@
-"""Layered DAG layout → world coordinates per docs/COORDINATES.md.
+"""Layout via Graphviz dot → world coordinates per docs/COORDINATES.md.
 
-Latitude = dependency altitude (foundations south, consumers north).
-Longitude = barycenter-ordered domain corridors.
-Deterministic full relayout (dev-scale; incremental stability is Q-22).
-Positions are DERIVED data (ADR-0026) — rebuildable, never truth.
+USER RULING (2026-08-09, docs/research/layout-sota-2026-08.md): dot is the
+REFERENCE ENGINE — it teaches us what correct looks like (network-simplex
+layering, median+transpose mincross, coordinate assignment, splines routed
+around nodes). We will almost certainly hand-implement the pipeline later;
+positions are DERIVED data (ADR-0026), so the engine is swappable.
+
+World contract kept: latitude = dependency altitude with FOUNDATIONS AT TOP
+(dot rankdir=TB gives this free — sources rank first), longitude = neighbor-
+hood corridors (dot's coordinate assignment). Version nodes stay SATELLITES
+(timeline cascade off their family root, ~10° slope).
 """
-from httk.store import HARD_TYPES, TAXONOMY_TYPES
-
+import json
 import math
-import zlib
+import os
+import shutil
+import subprocess
+
+from httk.store import HARD_TYPES, TAXONOMY_TYPES
 
 LAT_MIN, LAT_MAX = -78.0, 78.0
 LNG_MIN, LNG_MAX = -179.0, 179.0
+
+_DOT_CANDIDATES = (shutil.which("dot"),
+                   r"C:\Program Files\Graphviz\bin\dot.exe",
+                   "/usr/bin/dot", "/usr/local/bin/dot")
+DOT = next((p for p in _DOT_CANDIDATES if p and os.path.exists(p)), "dot")
+
+# degrees per graphviz point: sets on-map density (node pitch ≈ 8° at dev
+# scale); capped so tall/wide graphs still fit the world bands
+_SCALE = 0.066
 
 
 def importance(view):
@@ -52,117 +70,123 @@ def version_map(view):
     return out
 
 
-def layered_layout(view):
-    """→ {node_id: (lng, lat, layer)}. Layer = longest provider path (hard edges);
-    x = barycenter of providers, ties broken by node_id (deterministic).
-    Version nodes are excluded and attached as timeline cascades afterward."""
-    vmap = version_map(view)
-    nodes = [n for n in view.nodes() if n not in vmap]
+def _depths(view, nodes, vmap):
+    """Longest provider path — kept only as the `layer` display prop."""
     providers = {n: [e["from"] for e in view.edges_in(n, HARD_TYPES | TAXONOMY_TYPES)
                      if view.node(e["from"]) and e["from"] not in vmap]
                  for n in nodes}
-
     depth = {}
 
     def d(n, stack=frozenset()):
         if n in depth:
             return depth[n]
         if n in stack:
-            return 0                        # cycle guard (OPTIMIZES excluded anyway)
+            return 0
         ps = providers.get(n, [])
         depth[n] = 0 if not ps else 1 + max(d(p, stack | {n}) for p in ps)
         return depth[n]
 
     for n in nodes:
         d(n)
+    return depth
 
-    layers = {}
-    for n, ly in depth.items():
-        layers.setdefault(ly, []).append(n)
-    max_layer = max(layers) if layers else 0
 
-    # DETANGLE (user ruling): alternating barycenter sweeps — order every layer
-    # by where its neighbors sit in the adjacent layer, downward then upward,
-    # repeated. Crossings untwist AND siblings of a hub become adjacent by
-    # construction, so similar things group instead of sprawling.
-    # Layer-spanning edges get VIRTUAL waypoints (Sugiyama) so an edge passing
-    # THROUGH a layer claims a slot there — long diagonals stop slicing
-    # blindly across neighborhoods they aren't part of.
-    sweep_prov = {n: list(ps) for n, ps in providers.items()}
-    virtuals = set()
-    springs = []                       # long edges become chains through them
+def _dot_quote(s):
+    return '"' + s.replace('"', r'\"') + '"'
+
+
+def _spline_to_polyline(pos_attr, steps=8):
+    """Graphviz edge pos (cubic B-spline control points, optional s/e arrow
+    points) → sampled polyline in graphviz points."""
+    pts, endp, startp = [], None, None
+    for tok in pos_attr.split():
+        if tok.startswith("e,"):
+            endp = tuple(map(float, tok[2:].split(",")))
+        elif tok.startswith("s,"):
+            startp = tuple(map(float, tok[2:].split(",")))
+        else:
+            pts.append(tuple(map(float, tok.split(","))))
+    if not pts:
+        return []
+    out = [startp] if startp else []
+    out.append(pts[0])
+    for i in range(1, len(pts) - 2, 3):    # cubic segments: p0 + triples
+        p0 = out[-1]
+        p1, p2, p3 = pts[i], pts[i + 1], pts[i + 2]
+        for s in range(1, steps + 1):
+            t = s / steps
+            mt = 1 - t
+            out.append((mt**3 * p0[0] + 3 * mt * mt * t * p1[0]
+                        + 3 * mt * t * t * p2[0] + t**3 * p3[0],
+                        mt**3 * p0[1] + 3 * mt * mt * t * p1[1]
+                        + 3 * mt * t * t * p2[1] + t**3 * p3[1]))
+    if endp:
+        out.append(endp)
+    return out
+
+
+def compute_layout(view):
+    """→ (pos, edge_paths).
+    pos: {node_id: (lng, lat, layer)}; edge_paths: {edge_id: [(lng, lat), …]}
+    (dot's splines, already routed AROUND node boxes — no node-edge overlap
+    by construction; the SOTA finding our hand-rolled arcs never had)."""
+    vmap = version_map(view)
+    nodes = sorted(n for n in view.nodes() if n not in vmap)
+    depth = _depths(view, nodes, vmap)
+
+    lines = ["digraph httk {",
+             '  rankdir=TB; splines=true; nodesep=0.6; ranksep=1.1;',
+             '  node [shape=box, fixedsize=true, width=1.1, height=0.9,'
+             ' label=""];']
     for n in nodes:
-        for p in providers.get(n, []):
-            span = depth[n] - depth[p]
-            if span > 1:
-                prev = p
-                for step in range(1, span):
-                    v = f"~{p}~{n}~{step}"
-                    virtuals.add(v)
-                    layers.setdefault(depth[p] + step, []).append(v)
-                    sweep_prov[v] = [prev]
-                    springs.append((prev, v))
-                    prev = v
-                springs.append((prev, n))
-                sweep_prov[n] = [x for x in sweep_prov[n] if x != p] + [prev]
-            else:
-                springs.append((p, n))
-    consumers = {}
-    for n, ps in sweep_prov.items():
-        for p in ps:
-            consumers.setdefault(p, []).append(n)
-    order = {ly: sorted(ns) for ly, ns in layers.items()}
-    idx = {n: i for ns in order.values() for i, n in enumerate(ns)}
+        lines.append(f"  {_dot_quote(n)};")
+    edge_ids = []
+    for n in nodes:
+        for e in sorted(view.edges_in(n, None), key=lambda e: e["edge_id"]):
+            a, b = e["from"], e["to"]
+            if a in vmap or b in vmap or a not in depth or not view.node(a):
+                continue
+            hard = e["type"] in (HARD_TYPES | TAXONOMY_TYPES)
+            attrs = f'id={_dot_quote(e["edge_id"])}'
+            if not hard:                   # story edges ride along, never rank
+                attrs += ", constraint=false, weight=0"
+            lines.append(f"  {_dot_quote(a)} -> {_dot_quote(b)} [{attrs}];")
+            edge_ids.append(e["edge_id"])
+    lines.append("}")
+    src = "\n".join(lines)
 
-    def _sweep(neigh):
-        for ly in _sweep.dirn:
-            def bary(n):
-                xs = [idx[m] for m in neigh.get(n, []) if m in idx]
-                return (sum(xs) / len(xs)) if xs else idx[n]
-            order[ly] = sorted(order[ly], key=lambda n: (bary(n), n))
-            for i, n in enumerate(order[ly]):
-                idx[n] = i
+    out = subprocess.run([DOT, "-Tjson"], input=src.encode("utf-8"),
+                         capture_output=True, check=True, timeout=120)
+    doc = json.loads(out.stdout.decode("utf-8"))
 
-    for _ in range(8):
-        _sweep.dirn = sorted(order)                    # down: follow providers
-        _sweep(sweep_prov)
-        _sweep.dirn = sorted(order, reverse=True)      # up: follow consumers
-        _sweep(consumers)
+    bb = [float(v) for v in doc["bb"].split(",")]     # x0,y0,x1,y1 (y up)
+    w, h = bb[2] - bb[0], bb[3] - bb[1]
+    scale = min(_SCALE,
+                (LNG_MAX - LNG_MIN) * 0.9 / max(w, 1),
+                (LAT_MAX - LAT_MIN) * 0.9 / max(h, 1))
+    cx, cy = bb[0] + w / 2, bb[1] + h / 2
 
-    order_pairs = [(ns[i], ns[i + 1]) for ns in order.values()
-                   for i in range(len(ns) - 1)]
+    def world(x, y):
+        return ((x - cx) * scale, (y - cy) * scale)
 
     pos = {}
-    for ly in sorted(layers):
-        ordered = order[ly]
-        k = len(ordered)
-        # compact world: spread sized to content (zoom-out stays possible;
-        # the map grows as corridors multiply, never sprawls preemptively)
-        span = min(100.0, 9.0 * max(k, 1))
-        for i, n in enumerate(ordered):
-            lng = 0.0 if k == 1 else (-span / 2 + span * i / (k - 1))
-            # User ruling: foundations at the TOP, derived tech descending —
-            # the iPhone sits at the bottom of everything it rests on.
-            lat = LAT_MAX if max_layer == 0 else (
-                LAT_MAX - (LAT_MAX - LAT_MIN) * ly / max_layer)
-            pos[n] = (max(LNG_MIN, min(LNG_MAX, lng)), lat, ly)
-    # virtuals influenced ordering + initial spacing only — the physics runs
-    # on real bodies and real edges (virtual bodies fought the springs)
-    pos = {n: p for n, p in pos.items() if n not in virtuals}
-    real_springs = [(a, b) for a, b in springs
-                    if a not in virtuals and b not in virtuals]
-    long_edges = [(e["from"], e["to"]) for n in nodes
-                  for e in view.edges_in(n, HARD_TYPES | TAXONOMY_TYPES)
-                  if depth.get(e["to"], 0) - depth.get(e["from"], 0) > 1
-                  and e["from"] in pos]
-    order_pairs = [(ns[i], ns[i + 1])
-                   for ns in ([x for x in layer if x not in virtuals]
-                              for layer in order.values())
-                   for i in range(len(ns) - 1)]
-    pos = _relax(pos, real_springs + long_edges, importance(view), order_pairs)
+    for obj in doc.get("objects", []):
+        n = obj.get("name")
+        if n in depth and "pos" in obj:
+            x, y = map(float, obj["pos"].split(","))
+            lng, lat = world(x, y)
+            pos[n] = (lng, lat, depth[n])
 
-    # timeline cascade (user ruling): versions step DOWN AND TO THE RIGHT of
-    # their family root, ordered by date — generations reading like a waterfall
+    edge_paths = {}
+    for e in doc.get("edges", []):
+        eid = e.get("id")
+        if eid and "pos" in e:
+            pl = _spline_to_polyline(e["pos"])
+            if len(pl) >= 2:
+                edge_paths[eid] = [world(x, y) for x, y in pl]
+
+    # timeline cascade (user ruling): versions step down-and-right of their
+    # family root at ~10°, ordered by date — a waterfall of generations
     by_family = {}
     for v, (fam, year) in vmap.items():
         by_family.setdefault(fam, []).append((year, v))
@@ -171,62 +195,105 @@ def layered_layout(view):
             continue
         fx, fy, fl = pos[fam]
         for i, (year, v) in enumerate(sorted(versions)):
-            # gentle ~10° slope (user ruling) — a timeline, not a staircase
             pos[v] = (max(LNG_MIN, min(LNG_MAX, fx + 7.0 + 7.0 * i)),
                       max(LAT_MIN, fy - 2.0 - 1.25 * i), fl)
-    return pos
+    return pos, edge_paths
 
 
-def _relax(pos, edges, imp, order_pairs=(), iters=260):
-    """Airport-map settling (user rulings): bodies move out of the way, HUBS
-    CARVE TERRITORY (repulsion scales with importance product), LEAVES HUG
-    their hub (spring rest length shrinks for low-importance endpoints), and a
-    soft altitude anchor keeps the up/down meaning. Deterministic; O(n²) —
-    spatial hashing when corridors multiply."""
-    ids = sorted(pos)
-    P = {n: [pos[n][0], pos[n][1]] for n in ids}
-    anchor = {n: pos[n][1] for n in ids}
-    w = {n: 0.55 + 0.6 * imp.get(n, 0.0) for n in ids}   # softer hub differential
-    for it in range(iters):
-        F = {n: [0.0, 0.0] for n in ids}
-        for i, a in enumerate(ids):                      # repulsion: AIR (uncrammed)
-            for b in ids[i + 1:]:
-                dx, dy = P[a][0] - P[b][0], P[a][1] - P[b][1]
-                d2 = dx * dx + dy * dy + 0.01
-                if d2 < 1.0:      # coincident books stack forever (zero force
-                    # direction) — un-stack along a deterministic angle
-                    ang = (zlib.crc32(f"{a}|{b}".encode()) % 6283) / 1000.0
-                    dx += math.cos(ang); dy += math.sin(ang)
-                    d2 = dx * dx + dy * dy + 0.01
-                if d2 < 4900:
-                    d = d2 ** 0.5
-                    f = 1250.0 * w[a] * w[b] / d2
-                    F[a][0] += f * dx / d; F[a][1] += f * dy / d
-                    F[b][0] -= f * dx / d; F[b][1] -= f * dy / d
-        for u, v in edges:                               # springs: leaves hug
-            if u not in P or v not in P:
+def layered_layout(view):
+    """Positions only (compat wrapper over compute_layout)."""
+    return compute_layout(view)[0]
+
+
+# ---------------------------------------------------------------------------
+# Corridor countries (GMap lineage): deterministic label-propagation clusters
+# over the constraint graph, drawn as padded hulls — regions instead of
+# inter-cluster edge ink.
+# ---------------------------------------------------------------------------
+
+def clusters(view):
+    """{node: cluster_label} via deterministic label propagation on the
+    undirected hard+taxonomy graph (min-label tie-break, fixed sweep order)."""
+    vmap = version_map(view)
+    nodes = sorted(n for n in view.nodes() if n not in vmap)
+    neigh = {n: set() for n in nodes}
+    for n in nodes:
+        for e in view.edges_in(n, HARD_TYPES | TAXONOMY_TYPES):
+            if e["from"] in neigh:
+                neigh[n].add(e["from"]); neigh[e["from"]].add(n)
+    label = {n: n for n in nodes}
+    for _ in range(30):
+        changed = False
+        for n in nodes:
+            if not neigh[n]:
                 continue
-            dx, dy = P[v][0] - P[u][0], P[v][1] - P[u][1]
-            d = (dx * dx + dy * dy) ** 0.5 + 1e-6
-            rest = 34.0 + 16.0 * (imp.get(u, 0) + imp.get(v, 0))
-            f = 0.02 * (d - rest)
-            F[u][0] += f * dx / d; F[u][1] += f * dy / d
-            F[v][0] -= f * dx / d; F[v][1] -= f * dy / d
-            # TOP-DOWN FLOW (user ruling): dependency chains align into
-            # vertical columns — pull edge endpoints toward one longitude
-            ax = 0.028 * dx
-            F[u][0] += ax; F[v][0] -= ax
-        for a, b in order_pairs:      # the sweeps' untangling SURVIVES the
-            # physics: within a layer, b stays right of a (no drive-bys that
-            # re-cross what the barycenter passes untwisted)
-            dx = P[b][0] - P[a][0]
-            if dx < 8.0:
-                f = 0.09 * (8.0 - dx)
-                F[a][0] -= f; F[b][0] += f
-        for n in ids:                                    # altitude still means
-            F[n][1] += 0.06 * (anchor[n] - P[n][1])
-        step = 0.55 * (1 - it / iters) + 0.04
-        for n in ids:
-            P[n][0] = max(LNG_MIN, min(LNG_MAX, P[n][0] + step * F[n][0]))
-            P[n][1] = max(LAT_MIN, min(LAT_MAX, P[n][1] + step * F[n][1]))
-    return {n: (P[n][0], P[n][1], pos[n][2]) for n in ids}
+            counts = {}
+            for m in neigh[n]:
+                counts[label[m]] = counts.get(label[m], 0) + 1
+            best = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+            if best != label[n] and counts[best] > counts.get(label[n], 0):
+                label[n] = best
+                changed = True
+        if not changed:
+            break
+    # versions belong to their family's country
+    for v, (fam, _) in vmap.items():
+        if fam in label:
+            label[v] = label[fam]
+    return label
+
+
+def _hull(points):
+    """Andrew's monotone chain convex hull."""
+    pts = sorted(set(points))
+    if len(pts) <= 2:
+        return pts
+
+    def cross(o, a, b):
+        return (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0])
+    lo, hi = [], []
+    for p in pts:
+        while len(lo) >= 2 and cross(lo[-2], lo[-1], p) <= 0:
+            lo.pop()
+        lo.append(p)
+    for p in reversed(pts):
+        while len(hi) >= 2 and cross(hi[-2], hi[-1], p) <= 0:
+            hi.pop()
+        hi.append(p)
+    return lo[:-1] + hi[:-1]
+
+
+def regions(view, pos, imp):
+    """Country polygons: per cluster (≥2 members placed), a convex hull
+    padded outward — plus a name from the most important member."""
+    label = clusters(view)
+    groups = {}
+    for n, lab in label.items():
+        if n in pos:
+            groups.setdefault(lab, []).append(n)
+    out = []
+    for i, (lab, members) in enumerate(sorted(groups.items())):
+        if len(members) < 2:
+            continue
+        pts = [(pos[n][0], pos[n][1]) for n in members]
+        hull = _hull(pts)
+        if len(hull) < 3:                  # 2 nodes → capsule rectangle
+            (x1, y1), (x2, y2) = pts[0], pts[-1]
+            dx, dy = x2 - x1, y2 - y1
+            L = (dx*dx + dy*dy) ** 0.5 + 1e-9
+            nx, ny = -dy / L * 4.5, dx / L * 4.5
+            hull = [(x1+nx, y1+ny), (x2+nx, y2+ny),
+                    (x2-nx, y2-ny), (x1-nx, y1-ny)]
+        cxp = sum(p[0] for p in hull) / len(hull)
+        cyp = sum(p[1] for p in hull) / len(hull)
+        pad = []
+        for (x, y) in hull:
+            dx, dy = x - cxp, y - cyp
+            d = (dx*dx + dy*dy) ** 0.5 + 1e-9
+            grow = 6.0 + 0.35 * d          # proportional padding, min 6°
+            pad.append((x + dx / d * grow, y + dy / d * grow))
+        top = max(members, key=lambda n: (imp.get(n, 0), n))
+        out.append({"polygon": pad,
+                    "name": view.field(top, "name") or top,
+                    "tint": i % 6, "members": sorted(members)})
+    return out

@@ -11,7 +11,6 @@ The PMTiles bulk pyramid bakes this same contract ahead-of-time at scale.
 import math
 import os
 import sys
-import zlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "kernel"))
@@ -24,33 +23,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from httk import Store, View, realizable
 from httkdb.factlog import PgFactLog
-from httkserver.layout import layered_layout, importance, version_map
+from httkserver.layout import compute_layout, importance, version_map, regions
 
 EXTENT = 4096
 BUF = 256                     # tile buffer: geometry clipped server-side (px)
 GHOST_TYPES = {"ASSOCIATION", "SUCCEEDS"}
 HARD = {"ENABLES", "IS_COMPONENT_OF", "IS_INGREDIENT_OF", "IS_TYPE_OF",
         "IS_REFINEMENT_OF"}
-
-
-def _bezier(a, b, n=14, seed=""):
-    """Organic arc between world points: quadratic bezier bowed perpendicular.
-    Bow SIGN and magnitude jitter deterministically per edge (seed) so near-
-    parallel wires separate instead of braiding into a rat's nest."""
-    (x0, y0), (x1, y1) = a, b
-    mx, my = (x0 + x1) / 2, (y0 + y1) / 2
-    dx, dy = x1 - x0, y1 - y0
-    dist = (dx * dx + dy * dy) ** 0.5 or 1.0
-    h = zlib.crc32(seed.encode()) & 0xffff   # stable across processes
-    sign = 1.0 if (h & 1) else -1.0
-    bow = sign * min(7.0, dist * 0.12) * (0.55 + 0.9 * ((h >> 1) % 1000) / 1000)
-    cx, cy = mx - dy / dist * bow, my + dx / dist * bow
-    pts = []
-    for i in range(n + 1):
-        t = i / n
-        pts.append(((1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * x1,
-                    (1 - t) ** 2 * y0 + 2 * (1 - t) * t * cy + t * t * y1))
-    return pts
 
 
 def _clip_seg(p, q, lo, hi):
@@ -95,6 +74,44 @@ def _clip_polyline(pts, lo, hi):
         runs.append(cur)
     return runs
 
+
+def _clip_polygon(pts, lo, hi):
+    """Sutherland–Hodgman clip of a polygon ring to the box."""
+    def clip_edge(poly, inside, isect):
+        out = []
+        for i, cur in enumerate(poly):
+            prev = poly[i - 1]
+            if inside(cur):
+                if not inside(prev):
+                    out.append(isect(prev, cur))
+                out.append(cur)
+            elif inside(prev):
+                out.append(isect(prev, cur))
+        return out
+
+    def x_isect(x):
+        def f(p, q):
+            t = (x - p[0]) / (q[0] - p[0])
+            return (x, p[1] + t * (q[1] - p[1]))
+        return f
+
+    def y_isect(y):
+        def f(p, q):
+            t = (y - p[1]) / (q[1] - p[1])
+            return (p[0] + t * (q[0] - p[0]), y)
+        return f
+
+    poly = list(pts)
+    for inside, isect in (
+            (lambda p: p[0] >= lo, x_isect(lo)),
+            (lambda p: p[0] <= hi, x_isect(hi)),
+            (lambda p: p[1] >= lo, y_isect(lo)),
+            (lambda p: p[1] <= hi, y_isect(hi))):
+        poly = clip_edge(poly, inside, isect)
+        if len(poly) < 3:
+            return []
+    return poly
+
 app = FastAPI(title="httk-tiler")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
@@ -119,9 +136,11 @@ def _state():
     if seq != _cache["seq"]:
         store = Store.load(pg.export_jsonl())
         view = View(store)
-        _cache.update(seq=seq, store=store, view=view,
-                      pos=layered_layout(view), imp=importance(view),
-                      vmap=version_map(view))
+        pos, paths = compute_layout(view)
+        imp = importance(view)
+        _cache.update(seq=seq, store=store, view=view, pos=pos, paths=paths,
+                      imp=imp, vmap=version_map(view),
+                      regions=regions(view, pos, imp))
     return _cache
 
 
@@ -175,14 +194,34 @@ def tile(z: int, x: int, y: int):
                 "family": st["vmap"].get(n, (None,))[0] or "",
             },
         })
+    region_feats = []
+    for r in st["regions"]:
+        ring = [_lnglat_to_tilepx(lng, lat, z, x, y) for lng, lat in r["polygon"]]
+        clipped = _clip_polygon(ring, -BUF, EXTENT + BUF)
+        if clipped:
+            region_feats.append({
+                "geometry": {"type": "Polygon",
+                             "coordinates": [[list(p) for p in clipped]
+                                             + [list(clipped[0])]]},
+                "properties": {"name": r["name"], "tint": r["tint"]}})
+        # label point rides in the tile holding the region centroid
+        cx = sum(p[0] for p in r["polygon"]) / len(r["polygon"])
+        cy = sum(p[1] for p in r["polygon"]) / len(r["polygon"])
+        px_, py_ = _lnglat_to_tilepx(cx, cy, z, x, y)
+        if 0 <= px_ < EXTENT and 0 <= py_ < EXTENT:
+            region_feats.append({
+                "geometry": {"type": "Point", "coordinates": [px_, py_]},
+                "properties": {"name": r["name"], "tint": r["tint"],
+                               "label": True}})
     for e in view._edges.values():
         a, b = pos.get(e["from"]), pos.get(e["to"])
         if not a or not b:
             continue
-        # organic arc in world space (consistent across tiles), then per-tile
+        # dot's spline (routed AROUND node boxes) in world space, consistent
+        # across tiles; straight fallback for satellite/ghost edges. Per-tile
         # convert + Liang-Barsky clip to buffer — no breaks at any zoom
-        arc = _bezier((a[0], a[1]), (b[0], b[1]), seed=e["edge_id"])
-        px = [_lnglat_to_tilepx(lng, lat, z, x, y) for lng, lat in arc]
+        path = st["paths"].get(e["edge_id"]) or [(a[0], a[1]), (b[0], b[1])]
+        px = [_lnglat_to_tilepx(lng, lat, z, x, y) for lng, lat in path]
         for run in _clip_polyline(px, -BUF, EXTENT + BUF):
             edges_feats.append({
                 "geometry": {"type": "LineString",
@@ -198,6 +237,7 @@ def tile(z: int, x: int, y: int):
                                            or "")},
             })
     data = mapbox_vector_tile.encode([
+        {"name": "regions", "features": region_feats},
         {"name": "edges", "features": edges_feats},
         {"name": "nodes", "features": nodes_feats},
     ], default_options={"extents": EXTENT})
@@ -286,6 +326,14 @@ def search(q: str):
 # dimming rides feature-state 'dim' set by the viewer.
 DIM = ["case", ["boolean", ["feature-state", "dim"], False]]
 
+# Edges: FAINT AT REST, VIVID ON FOCUS (user ruling, 2026-08-09 — the
+# unanimous production graph-map pattern). 'lit' = in the focused closure.
+def _edge_state(lit, dim, rest):
+    return ["case",
+            ["boolean", ["feature-state", "lit"], False], lit,
+            ["boolean", ["feature-state", "dim"], False], dim,
+            rest]
+
 
 @app.get("/style.json")
 def style():
@@ -308,22 +356,57 @@ def style():
         "layers": [
             {"id": "bg", "type": "background",
              "paint": {"background-color": "#ffffff"}},
+            {"id": "regions", "type": "fill", "source": "httk",
+             "source-layer": "regions", "filter": ["!", ["has", "label"]],
+             "paint": {"fill-color": ["match", ["get", "tint"],
+                                      0, "#eef3fa", 1, "#f0f7ee", 2, "#faf3ec",
+                                      3, "#f5eef7", 4, "#eef7f6", "#f7f2ec"],
+                       "fill-opacity": 0.8,
+                       "fill-outline-color": "#dde4ee"}},
+            {"id": "region-labels", "type": "symbol", "source": "httk",
+             "source-layer": "regions", "filter": ["has", "label"],
+             "layout": {"text-field": ["get", "name"],
+                        "text-size": ["interpolate", ["linear"], ["zoom"],
+                                      1, 14, 5, 26],
+                        "text-transform": "uppercase",
+                        "text-letter-spacing": 0.32,
+                        "text-optional": True},
+             "paint": {"text-color": "#a9b4c4", "text-opacity": 0.75,
+                       "text-halo-color": "#ffffff", "text-halo-width": 1.2}},
             {"id": "edges-ghost", "type": "line", "source": "httk",
              "source-layer": "edges", "filter": ["get", "ghost"],
              "layout": {"line-cap": "round"},
              "paint": {"line-color": "#b8aecb", "line-width": 1.0,
-                       "line-opacity": [*DIM, 0.1, 0.45],
+                       "line-opacity": _edge_state(0.6, 0.03, 0.08),
                        "line-dasharray": ["literal", [1, 3]]}},
+            {"id": "edges-casing", "type": "line", "source": "httk",
+             "source-layer": "edges", "filter": ["!", ["get", "ghost"]],
+             "layout": {"line-cap": "round", "line-join": "round"},
+             "paint": {"line-color": "#ffffff",
+                       "line-width": ["interpolate", ["linear"], ["zoom"],
+                                      2, ["+", 3.2, ["*", 1.8, ["get", "rank"]]],
+                                      8, ["+", 4.4, ["*", 2.6, ["get", "rank"]]]],
+                       "line-opacity": _edge_state(0.95, 0.0, 0.0)}},
             {"id": "edges", "type": "line", "source": "httk", "source-layer": "edges",
              "filter": ["!", ["get", "ghost"]],
              "layout": {"line-cap": "round", "line-join": "round"},
-             "paint": {"line-color": ["case", ["get", "shadowed"], "#c3ccd8",
-                                      "#8aa8cf"],
+             "paint": {"line-color": ["case",
+                                      ["boolean", ["feature-state", "lit"], False],
+                                      "#3565b8",
+                                      ["case", ["get", "shadowed"], "#c3ccd8",
+                                       "#8aa8cf"]],
                        "line-width": ["interpolate", ["linear"], ["zoom"],
-                                      2, ["+", 0.8, ["*", 1.8, ["get", "rank"]]],
-                                      8, ["+", 1.6, ["*", 2.6, ["get", "rank"]]]],
-                       "line-opacity": [*DIM, 0.25,
-                                        ["+", 0.45, ["*", 0.4, ["get", "rank"]]]],
+                                      2, _edge_state(
+                                          ["+", 1.8, ["*", 1.8, ["get", "rank"]]],
+                                          0.8,
+                                          ["+", 0.8, ["*", 1.2, ["get", "rank"]]]),
+                                      8, _edge_state(
+                                          ["+", 2.8, ["*", 2.6, ["get", "rank"]]],
+                                          1.2,
+                                          ["+", 1.4, ["*", 1.8, ["get", "rank"]]])],
+                       "line-opacity": _edge_state(
+                           0.95, 0.04,
+                           ["+", 0.10, ["*", 0.10, ["get", "rank"]]]),
                        "line-dasharray": ["case", ["get", "shadowed"],
                                           ["literal", [2, 2]], ["literal", [1, 0]]]}},
             {"id": "node-ring", "type": "symbol", "source": "httk",
