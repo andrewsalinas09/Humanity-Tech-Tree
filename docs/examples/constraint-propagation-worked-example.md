@@ -88,6 +88,10 @@ SOLVE buildable?(iPhone) @ (2026, global)
 
 Honesty notes: the package→per-gate translation is *authored* edge content, never computed; the tube kill compares *declared* values (undeclared would pass presumed-satisfiable per TB-066 — and the absurd green trace becomes the bounty that gets the attribute declared); "riding up" in v1 means checks fire against declared values at each seam (A18's cited 2.5W satisfies the 3W demand) — never gate-count arithmetic (Q-10 deferred); and `buildable?(CPU) @ 1946` passes the tube branch — same graph, opposite selection, both true.
 
+## Constraint classes in this example (ADR-0039)
+
+The two kills in the trace belong to different classes: the purity demand at the silicon seam is **PHYSICAL** — 90% silicon yields no functioning transistor, ever (citation-backed; feeds PROVEN_UNREALIZABLE). The power/size demands at the iPhone and gate seams are **FITNESS** — the tube branch *functions* (ENIAC is the proof) and is vetoed only for this consumer's purpose. The vacuum-tube iPhone's honest verdict is therefore "physically possible, absurdly unfit: ~10⁴× volume, ~10³× power" — a reasons list, not an impossibility. Cost constraints are always FITNESS, and since cost *values* are dated facts, fitness verdicts move with eras automatically (aluminum: more precious than gold in 1860, sandwich wrap by 1960 — same physics, flipped fitness, zero schema changes).
+
 ## The takeaway sentence
 
 Demand flows down and translates; attributes flow up and compose; branches die per-query at whichever seam the numbers (or the topology) collide — and the losing branch is never wrong, only unfit for this consumer's purpose, exactly like real engineering.

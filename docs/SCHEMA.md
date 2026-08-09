@@ -48,7 +48,7 @@ IS_TYPE_OF poly-hierarchy is legal (H17). Effective requirements = AND across al
 | `truth_level` | enum EpistemicStatus (mainstream_fact → mythology) | ADR-0027 |
 | `validity` | enum ValidityStatus | ADR-0027 — disproven mechanisms between valid nodes |
 | `start_date`, `end_date` | DatePoint? | multiple active periods = multiple edges |
-| `constraints` | AttributeConstraint[] (GT/LT/EQ/CONTAINS) | ADR-0005 — consumer defines the need; evaluation is three-valued (ADR-0037): undeclared attribute or overlapping uncertainty → **UNKNOWN** (never a silent pass, never a block); certain violation → VIOLATED |
+| `constraints` | AttributeConstraint[] {attr, op GT/LT/EQ/CONTAINS, value, **class: PHYSICAL\|FITNESS**} | ADR-0005 (consumer defines the need) + ADR-0039 (class: PHYSICAL = nature's veto, feeds PROVEN_UNREALIZABLE, citation-required; FITNESS = purpose's veto, prunes per-query, the default — cost/size-for-purpose always FITNESS) + ADR-0037 (three-valued: undeclared/overlap → UNKNOWN; certain violation → VIOLATED) |
 | `optimization_factor` | OptimizationFactors? | trade-off deltas |
 | `shadowed_by_edge_ids` | edge_id[] | ADR-0021; re-validated on covering-edge change; exempt from implicit-AND (H12) |
 | `impact_weight` | float | subjective, labeled as such |
@@ -75,7 +75,7 @@ Citations attach per claim (node, edge, regional entry) as claim→source edges 
 
 ## 4. RequirementExpr (ADR-0017 + hardening)
 
-Boolean tree on the consumer node: leaves = **edge identities** (never assertion IDs — ADR-0038 invariant); AND/OR/NOT, arbitrary nesting; absent = AND of all hard edges. Evaluation is **three-valued with Kleene composition** (ADR-0037): AND — VIOLATED dominates, UNKNOWN dominates SATISFIED; OR — SATISFIED dominates, UNKNOWN dominates VIOLATED; NOT swaps SATISFIED/VIOLATED, UNKNOWN unchanged. Leaves map through inheritance overrides — EXCLUDE prunes its leaf as *vacuous* (removed — distinct from UNKNOWN), all-pruned connectives prune recursively (H11); shadowed edges are exempt from implicit-AND and satisfied by any covering edge (H12); implicit-AND operates over claim-equivalence classes (H13); NOT is legal but discouraged (NOT ≠ EXCLUDE — ADR-0019 §5). Top-level realizability lattice: PROVEN_REALIZABLE / UNKNOWN / PROVEN_UNREALIZABLE, with LOCKED/THEORETICAL/REALIZED as derived UI vocabulary; every result carries its per-claim gap list (the UNKNOWN set).
+Boolean tree on the consumer node: leaves = **edge identities** (never assertion IDs — ADR-0038 invariant); AND/OR/NOT, arbitrary nesting; absent = AND of all hard edges. Evaluation is **three-valued with Kleene composition** (ADR-0037): AND — VIOLATED dominates, UNKNOWN dominates SATISFIED; OR — SATISFIED dominates, UNKNOWN dominates VIOLATED; NOT swaps SATISFIED/VIOLATED, UNKNOWN unchanged. Leaves map through inheritance overrides — EXCLUDE prunes its leaf as *vacuous* (removed — distinct from UNKNOWN), all-pruned connectives prune recursively (H11); shadowed edges are exempt from implicit-AND and satisfied by any covering edge (H12); implicit-AND operates over claim-equivalence classes (H13); NOT is legal but discouraged (NOT ≠ EXCLUDE — ADR-0019 §5). Top-level solver output is **two-axis, each three-valued** (ADR-0037/0039): *existence* — PROVEN_REALIZABLE / UNKNOWN / PROVEN_UNREALIZABLE (PHYSICAL constraints only) — and *fitness* — FIT / UNFIT(reasons) / UNKNOWN (per consumer purpose; FITNESS constraints). LOCKED/THEORETICAL/REALIZED remain derived UI vocabulary; every result carries its per-claim gap list (the UNKNOWN set) and, when UNFIT, the violated-fitness reasons list ("physically possible; unfit: 10⁴× volume").
 
 ## 5. Trust & verification (events, all computed downstream)
 
@@ -181,6 +181,7 @@ Priors: epistemic enum shifts the squash midpoint (mythology ≫ mainstream_fact
 | L10 | Stale override: referenced taxonomy/edges changed → re-validate via check queue | H7 |
 | L11 | New second edge filling an existing role → wizard asks "alternative or additional?" (OR vs AND) | ADR-0017 |
 | L12 | Uncited claim → red badge (computed; not a linter rejection — never gate) | ADR-0030 |
+| L13 | Constraint marked PHYSICAL without a citation → flagged (impossibility carries the burden of proof) | ADR-0039 |
 
 ## 12. MCP surface v1 (ADR-0029; the human UI is a client of the same tools)
 
