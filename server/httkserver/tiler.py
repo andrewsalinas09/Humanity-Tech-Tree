@@ -127,7 +127,12 @@ def _lnglat_to_tilepx(lng, lat, z, tx, ty):
 
 
 def _cited(view, node_id):
-    return bool(view.field(node_id, "citation") or view.field(node_id, "citations"))
+    """ADR-0038: citations target ASSERTIONS — a node counts as cited when any
+    of its claims' authoritative assertions carries a citation."""
+    for (subj, field), (aid, _v) in view._fields.items():
+        if subj == node_id and view.field(aid, "citation"):
+            return True
+    return False
 
 
 @app.get("/changes")
