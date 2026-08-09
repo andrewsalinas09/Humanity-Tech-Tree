@@ -170,9 +170,11 @@ def tile(z: int, x: int, y: int):
             continue          # points live in exactly ONE tile (no icon doubling)
         # anchors EXACTLY on a tile seam get dropped by symbol placement
         # (logic-gate at lat 0.0 vanished — the 'hidden bus node' bug);
-        # nudge half a tile-unit into the interior, visually imperceptible
-        px = min(max(px, 0.5), EXTENT - 0.5)
-        py = min(max(py, 0.5), EXTENT - 0.5)
+        # nudge ONE tile-unit inward (the MVT encoder quantizes to ints,
+        # so half-units round straight back onto the seam) — 1/4096 of a
+        # tile, visually imperceptible
+        px = min(max(px, 1.0), EXTENT - 1.0)
+        py = min(max(py, 1.0), EXTENT - 1.0)
         nd = view.node(n) or {}
         nodes_feats.append({
             "geometry": {"type": "Point", "coordinates": [px, py]},
