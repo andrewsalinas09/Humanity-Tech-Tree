@@ -117,6 +117,19 @@ def _cat(view, node_id):
     return n["category"] if n else None
 
 
+def _fresh_eid(view, base):
+    """Edge ids are IDENTITIES (ADR-0038) — never reuse one. The default
+    id scheme e_{from}_{to} collides when a second edge TYPE links the same
+    pair, and a tombstoned id silently swallows any future edge reusing it
+    (the Galaxy battery bug, 2026-08-09). Suffix until genuinely fresh."""
+    eid, i = base, 1
+    taken = set(view._edges) | getattr(view, "edge_tombstoned", set())
+    while eid in taken:
+        i += 1
+        eid = f"{base}_{i}"
+    return eid
+
+
 def _endpoints_exist(view, *node_ids):
     """Never wrong: an edge to a nonexistent id is a claim about NOTHING —
     reject with the missing ids named (the 'CPU' vs 'cpu' bug, 2026-08-09)."""
@@ -135,7 +148,7 @@ def add_component(view, whole, part, role=None, edge_id=None,
         return r
     if _cat(view, part) in PEOPLE_ORGS:
         return Rejection("L5", f"{part} is a person/org — people are never parts")
-    eid = edge_id or f"e_{part}_{whole}"
+    eid = edge_id or _fresh_eid(view, f"e_{part}_{whole}")
     e = {"edge_id": eid, "from": part, "to": whole,
          "type": "IS_COMPONENT_OF", "qualifier": None}
     return _add_or_alternative(view, whole, e, role,
@@ -148,7 +161,7 @@ def add_ingredient(view, product, ingredient, role=None, edge_id=None,
         return r
     if _cat(view, ingredient) in PEOPLE_ORGS:
         return Rejection("L5", f"{ingredient} is a person/org — never an ingredient")
-    eid = edge_id or f"e_{ingredient}_{product}"
+    eid = edge_id or _fresh_eid(view, f"e_{ingredient}_{product}")
     e = {"edge_id": eid, "from": ingredient,
          "to": product, "type": "IS_INGREDIENT_OF", "qualifier": None}
     return _add_or_alternative(view, product, e, role,
@@ -172,7 +185,7 @@ def add_enabler(view, enabled, enabler, justification=None, edge_id=None,
     dup = _claim_exists(view, enabler, enabled, "ENABLES")
     if dup:
         return Rejection("EXISTS", f"this link already exists as edge '{dup}'")
-    eid = edge_id or f"e_{enabler}_{enabled}"
+    eid = edge_id or _fresh_eid(view, f"e_{enabler}_{enabled}")
     e = {"edge_id": eid, "from": enabler, "to": enabled, "type": "ENABLES",
          "qualifier": None}
     return StagedFacts([("edge.create", e)]
@@ -190,7 +203,7 @@ def refine(view, family, version, edge_id=None,
         return Rejection("L4", "IS_REFINEMENT_OF requires same category")
     if view.edges_out(family, {"IS_REFINEMENT_OF"}):
         notes.append("ADR-0018: family is itself a version — flat star wants the root")
-    eid = edge_id or f"r_{version}_{family}"
+    eid = edge_id or _fresh_eid(view, f"r_{version}_{family}")
     e = {"edge_id": eid, "from": version, "to": family,
          "type": "IS_REFINEMENT_OF", "qualifier": None}
     return StagedFacts([("edge.create", e)]
@@ -202,7 +215,7 @@ def succeed(view, old, new, qualifier, edge_id=None,
     """old SUCCEEDS new (dated story: replaced/superseded/spun-off/rebranded...)."""
     if (r := _endpoints_exist(view, old, new)):
         return r
-    eid = edge_id or f"s_{old}_{new}"
+    eid = edge_id or _fresh_eid(view, f"s_{old}_{new}")
     e = {"edge_id": eid, "from": old, "to": new, "type": "SUCCEEDS",
          "qualifier": qualifier}
     return StagedFacts([("edge.create", e)]
@@ -214,7 +227,7 @@ def associate(view, a, b, qualifier, edge_id=None,
     """Ghost-layer story edge (solver-invisible by type)."""
     if (r := _endpoints_exist(view, a, b)):
         return r
-    eid = edge_id or f"a_{a}_{b}"
+    eid = edge_id or _fresh_eid(view, f"a_{a}_{b}")
     e = {"edge_id": eid, "from": a, "to": b, "type": "ASSOCIATION",
          "qualifier": qualifier}
     return StagedFacts([("edge.create", e)]
@@ -228,7 +241,7 @@ def classify(view, instance, type_, edge_id=None):
         pass  # re-classification idempotent-ish; DAG check below is the guard
     if instance in _ancestors(view, type_) or instance == type_:
         return Rejection("B1", "classification would create a taxonomy cycle")
-    e = {"edge_id": edge_id or f"t_{instance}_{type_}", "from": instance,
+    e = {"edge_id": edge_id or _fresh_eid(view, f"t_{instance}_{type_}"), "from": instance,
          "to": type_, "type": "IS_TYPE_OF", "qualifier": None}
     notes = []
     ci, ct = _cat(view, instance), _cat(view, type_)
