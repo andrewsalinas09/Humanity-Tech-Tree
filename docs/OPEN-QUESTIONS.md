@@ -37,8 +37,8 @@ When is manufacturing scale a hard requirement (EUV: binary) vs. optional (one-o
 ## Q-11: Data ingestion pipeline
 Generator scripts (CSV/Wikipedia lists → 5,000 CPUs), PubChem/SMILES/CAS for chemistry, Wikidata ID linkage — all proposed, none designed. Also: how ingestion respects the Significance Filter (ADR-0009).
 
-## Q-12: Frontend stack
-Cytoscape.js vs. React Flow vs. Qt suggested, none chosen. Blocked-on-nothing until Phase 3 (ADR-0014).
+## Q-12: Frontend stack — **Resolved → ADR-0044**
+The tech tree rendered as a planet: MapLibre GL graph surface over a server-generated vector-tile pyramid (PMTiles + dynamic tiler), deck.gl interleaved for near-zoom richness, Next.js self-hosted with ISR permalinks, React orchestration + Tailwind/shadcn + the trust visual language. Research: `docs/research/2026-08-graph-rendering.md`. Residual frontier: Q-22 (living-graph tiling).
 
 ## Q-13: Geometric/interface compatibility
 Socket-fits-bracket style constraints (set-intersection logic). Acknowledged as where simulation gives way to abstraction; no mechanism.
@@ -81,3 +81,6 @@ The "does this node already exist?" pipeline at billion-node scale: embed every 
 
 ## Q-21: EdgeType reduction to the orthogonal basis — **Resolved → ADR-0028**
 Final basis (8): ENABLES / IS_COMPONENT_OF / IS_INGREDIENT_OF / IS_TYPE_OF / IS_REFINEMENT_OF / OPTIMIZES / SUCCEEDS / ASSOCIATION, with the full legacy→basis+qualifier migration table in the ADR. One story partition for now (user: "this is a tech tree first and foremost" — story is supporting cast; lazy abstraction applied to the schema itself), with a costless mechanical split-by-qualifier escape hatch if profiling ever demands it. Carried-forward Phase 1 tasks: per-type category-compatibility rules (isValidConnection linter) and the starter qualifier vocabulary.
+
+## Q-22: Living-graph tile generation (ADR-0044 risk #1)
+Incremental re-tiling + layout stability for a continuously-edited billion-node graph has NO published solution (the 2026 MSAGLJS paper stops at 33k nodes, client-side; Map of GitHub is a static snapshot). To solve: which tile cells invalidate per fact-append; layout stability under insertion (nodes must not teleport when a neighbor is added — dampened/incremental ELK? reserved-space strategies?); rebuild cadence tiers (dynamic tiler for fresh edits over a periodically rebaked pyramid — the research's proposed split); zoom↔LOD calibration governance (the coordinate contract is frozen SCHEMA-level, ADR-0044 risk #2). We own this frontier.
