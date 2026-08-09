@@ -56,17 +56,24 @@ export default function Home() {
   // version families the user has "demerged" — collapsed by default
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const expandedRef = useRef<Set<string>>(expanded);
+  // the focused closure: PINNED VISIBLE at every zoom (user ruling — a
+  // clicked path must never disappear when zooming out)
+  const focusRef = useRef<{ n: string[]; e: string[] } | null>(null);
 
-  const applyExpand = (map: maplibregl.Map, fams: Set<string>) => {
+  const applyFilters = (map: maplibregl.Map) => {
     if (!map.getLayer("nodes")) return;
-    const list = ["literal", [...fams]] as any;
-    // zoom LOD (map-style: tiers appear as you zoom; versions auto-tuck)
-    // OR-composed with the manual demerge override for expanded families
+    const fams = ["literal", [...expandedRef.current]] as any;
+    const litN = ["literal", focusRef.current?.n ?? []] as any;
+    const litE = ["literal", focusRef.current?.e ?? []] as any;
+    // zoom LOD (map-style: tiers appear as you zoom; versions auto-tuck),
+    // OR manual demerge override, OR membership in the focused closure
     const showNode = ["any", ["<=", ["get", "zmin"], ["zoom"]],
-                      ["in", ["get", "family"], list]] as any;
+                      ["in", ["get", "family"], fams],
+                      ["in", ["get", "node_id"], litN]] as any;
     const showEdge = ["any", ["<=", ["get", "ezmin"], ["zoom"]],
                       ["all", ["!=", ["get", "vfamily"], ""],
-                       ["in", ["get", "vfamily"], list]]] as any;
+                       ["in", ["get", "vfamily"], fams]],
+                      ["in", ["get", "edge_id"], litE]] as any;
     map.setFilter("nodes", showNode);
     map.setFilter("node-ring", ["all", ["!", ["get", "cited"]], showNode]);
     map.setFilter("edges", ["all", ["!", ["get", "ghost"]], showEdge]);
@@ -78,7 +85,7 @@ export default function Home() {
     const next = new Set(expandedRef.current);
     next.has(fam) ? next.delete(fam) : next.add(fam);
     expandedRef.current = next; setExpanded(next);
-    if (mapRef.current) applyExpand(mapRef.current, next);
+    if (mapRef.current) applyFilters(mapRef.current);
   };
 
   const clearDim = (map: maplibregl.Map) => {
@@ -92,6 +99,8 @@ export default function Home() {
     // while everything else recedes (user ruling 2026-08-09).
     const cl = await (await fetch(`${TILER}/closure/${id}`)).json();
     const nodes = new Set<string>(cl.nodes), edges = new Set<string>(cl.edges);
+    focusRef.current = { n: cl.nodes, e: cl.edges };
+    applyFilters(map);
     clearDim(map);
     for (const f of map.querySourceFeatures("httk", { sourceLayer: "nodes" })) {
       const nid = f.properties?.node_id;
@@ -130,7 +139,7 @@ export default function Home() {
     map.on("load", () => {
       map.addImage("book", bookImage(), { pixelRatio: 2, sdf: true });
       map.addImage("book-ring", bookImage(44, 52, true), { pixelRatio: 2 });
-      applyExpand(map, expandedRef.current);   // versions start tucked in
+      applyFilters(map);                       // versions start tucked in
     });
     map.on("click", "nodes", (e) => {
       const id = e.features?.[0]?.properties?.node_id;
@@ -139,7 +148,8 @@ export default function Home() {
     map.on("click", (e) => {
       const hits = map.queryRenderedFeatures(e.point, { layers: ["nodes"] });
       if (!hits.length) { clearDim(map); setCard(null); setSel(null); setSolve(null);
-                          selRef.current = null; }
+                          selRef.current = null;
+                          focusRef.current = null; applyFilters(map); }
     });
     map.on("mouseenter", "nodes", () => (map.getCanvas().style.cursor = "pointer"));
     map.on("mouseleave", "nodes", () => (map.getCanvas().style.cursor = ""));

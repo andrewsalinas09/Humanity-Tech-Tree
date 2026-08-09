@@ -108,10 +108,10 @@ def _state():
         zmin = {}
         for n in pos:
             if n in vmap:
-                zmin[n] = 6
+                zmin[n] = 5
             else:
                 r = imp.get(n, 0.0)
-                zmin[n] = 0 if r >= 0.95 else 3 if r >= 0.6 else 4
+                zmin[n] = 0 if r >= 0.95 else 2 if r >= 0.6 else 3
         _cache.update(seq=seq, store=store, view=view, pos=pos, paths=paths,
                       imp=imp, vmap=vmap, zmin=zmin)
     return _cache
@@ -250,6 +250,12 @@ def closure(node_id: str, depth: int = 64, cap: int = 5000):
 
     walk(node_id, downstream=True)    # everything this enables, transitively
     walk(node_id, downstream=False)   # everything this rests on, transitively
+    # the focus node's own STORY context joins the light-up (1 hop, all edge
+    # types) — clicking Hedy Lamarr must light her associations, or people
+    # and documents read as unexplained floating books
+    for e in view.edges_in(node_id) + view.edges_out(node_id):
+        edges.add(e["edge_id"])
+        nodes.add(e["from"] if e["to"] == node_id else e["to"])
     return {"nodes": sorted(nodes), "edges": sorted(edges), "truncated": len(nodes) > cap}
 
 
