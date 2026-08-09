@@ -47,6 +47,17 @@ The attribute vocabulary is unbounded data (any name interned on first use, LLM-
 - *Honest display:* "3 constraints checked, 1 presumed (attribute undeclared)" — the presumption label (ADR-0019 vocabulary) at the attribute level.
 - *Convergence engine:* absurd answers trace to the exact seam lacking the exact attribute (ADR-0025 §6 debug harness) → one added fact kills the absurdity class graph-wide. The vacuum-tube iPhone needed ONE attribute at ONE seam; that economy is typical, which is why CPU never needs a billion specs — it needs the handful some consumer actually checks.
 
+## The three-way split, and constraints riding the claim (TB-067)
+
+"iPhone needs a CPU < 3W" involves three distinct objects with three distinct homes:
+1. **Attribute name** (`power_draw`) → the registry. Deduplicated by the Q-20-style semantic gate (embedding search over names+descriptions → choose or mint; LLM canonicalization converges synonyms; merge-redirects heal escaped duplicates).
+2. **Constraint** (`< 3W`) → the consumer edge (iPhone→CPU, ADR-0005). Never "added to" the provider.
+3. **Values** (`= 2.5W`) → provider nodes that actually have the property (A18 declares; the abstract CPU role declares nothing).
+
+**Constraints ride the claim, not the edge instance:** when interposition shadows a constraint-carrying edge (the `< 3W` was authored on iPhone→Transistor before CPU existed), the shadowed edge's constraints remain active demands evaluated along the covering chain (extension of H12: the chain must satisfy the shadowed leaf *and its constraints*). Monotone-safe — retention only prunes. The Intercept wizard additionally triages them toward the most specific correct seam ("relocate `< 3W` to iPhone→CPU?" — LLM proposes, human confirms, the Q-04 shape). Un-relocated is coarse, never wrong; any authoring order converges.
+
+Misplaced *values* need no special rule: a transistor node claiming `power_draw = 3W` is an unsupported fact — L3 verification fails against any real source, challenge, correct. (A `power_per_gate` value on Transistor is legitimate and distinct — the semantic gate keeps seam-level attributes related but separate.)
+
 ## Interactions already pinned elsewhere
 
 - OR-branch pruning vs conditionality: a constraint-pruned branch contributes no path, so it cannot witness unconditionality (stress-test HANDLED finding 15 — "path" means solver path, constraints constitutive).
