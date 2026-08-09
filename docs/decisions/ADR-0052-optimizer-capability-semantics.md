@@ -29,12 +29,14 @@
 ## The canonical chain (acceptance shape, TB-072)
 mining → quartz (as-found) → carbothermic smelting (+carbon, furnace) ⇒ silicon @0.98 → Siemens process (requests ≥0.98) ⇒ silicon @6N → transistor (requests >5N). Bootstrap lights smelter → Siemens → transistor's request met **via** the chain; remove the smelter from history and everything above honestly darkens.
 
-## Explicitly pending (Q-25 — do NOT improvise these)
-- Producer-edge bookkeeping: the smelter's input≠output (quartz→silicon), so by the rule of thumb it is NOT an optimizes loop — where does its output effect ride (ENABLES-with-effect vs a declared-baseline convention)?
-- SET/ADD/MULTIPLY honesty (relative ops with undeclared base ⇒ UNKNOWN).
-- Latch vs history (bootstrap path retires later — does the capability persist?).
-- Verb surface (set_effect, add_optimizer) and Result.via trace shape.
-- The Siemens expert-split worked example (TCS/distillation/CVD) → feeds Q-26 sheets.
+## Second ruling round (2026-08-09, all pending items resolved)
+- **Creation vs optimization (ruled):** "silicon isn't an optimization of quartz — it's something that is PRODUCED. A new thing." Producer processes CREATE via ordinary edges (quartz IS_INGREDIENT_OF silicon; smelter ENABLES silicon) and the producer's rated output rides its edge as an effect (`ENABLES` carries `effect`). OPTIMIZES stays exactly the loop-closer.
+- **Nature declares as-found, PER REGION:** quartz can carry purity — and it varies by deposit (TB-077, the Spruce Pine NC case: NC quartz is naturally ultra-pure while other sources need an added optimization step — the map must be able to show why one mine is critical). Regional attribute values join TB-031's RegionalAvailability machinery.
+- **Loop grammar confirmed:** internal loop edges are ordinary hard edges ("it's just a node graph that does something — the output is optimization"); process internals consume normal components (grease for the bearing of the motor in the plant, in theory); only the back-edge into the same material is OPTIMIZES.
+- **Ops granularity (delegated to Claude, judgment recorded):** first-order reality = **SET as the primary op** (industry publishes RATED outputs: a Siemens plant is rated 9–11N; datasheets, not per-pass physics) **plus relative ops (ADD/MULTIPLY) for genuinely iterative systems** — zone-refining passes, distillation stages, enrichment cascades (the canonical multi-pass loop). Honesty rule: relative ops with an undeclared base evaluate UNKNOWN, never a guess; existence uses the convergence limit under unbounded iterations; pass-count economics deferred to fitness. Multi-loop systems (98→99.9 loop A feeding 99.9→9N loop B) are already expressible as chained OPTIMIZES rungs — nothing fake, experts can always deepen a SET into per-pass detail later.
+- **Latch (ruled):** "once it's latched it's latched." The solver tracks FIRST-LIT dates (from process start dates + bootstrap order); timing exists so the graph can say "you could not make this in 1700 because …" — capability persists after a bootstrap path retires; extinction requires an explicit event.
+- **Trace at 10k-node depth (ruled by the scale question):** the via-trace is ONE HOP per request — "purity via siemens-process" — and each named process is itself solvable/clickable, so deep routes are explored by expansion, never dumped; Q-26 sheets collapse 100-node factories to single trace entries; gaps bubble the NEAREST missing rung only; the latched capability set is memoized derived data (recompute-on-change, like layout).
+- Remaining before build: verb names (set_effect / add_optimizer) and the Siemens expert-split worked example (feeds Q-26).
 
 ## Consequences
 - TB-072..075 added. Solver implementation follows the pending rulings, never precedes them.
