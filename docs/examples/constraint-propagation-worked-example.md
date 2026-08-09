@@ -36,6 +36,17 @@ Ask `buildable?(CPU, USA, 1946)` instead and the tube branch passes — ENIAC's 
 2. **Per-unit seam constraints — no aggregation.** Attributes meaningful at the seam itself (`switching_speed`, `power_per_gate`) are comparable without knowing counts. The canonical TB-001 kill. Authoring guidance: "define one or two key properties at the seam where Logic meets Hardware."
 3. **Aggregate simulation — deferred.** `total_power = per_gate × N` needs quantities (Q-10, deliberately deferred). The design never depends on this tier; if it ever arrives it slots in as more resolution, not a redesign.
 
+## Absence semantics — the permissive-monotone default (what makes lazy safe; TB-066)
+
+The attribute vocabulary is unbounded data (any name interned on first use, LLM-canonicalized — never a schema list to complete), and nodes declare only load-bearing attributes. That is only safe because absence has defined semantics:
+
+**A constraint referencing an attribute its provider has not declared passes as *presumed-satisfiable*, visibly labeled.** Never a failure, never an error.
+
+- *Why permissive:* failing on unknowns would make incompleteness break the graph (ADR-0015 forbids that); passing-labeled errs exactly as TB-001 errs — technically-true-until-constrained.
+- *Why monotone:* declaring an attribute can only prune more, never un-prune — so lazy addition in any order converges (ADR-0023 holds), and no one must pre-enumerate anything.
+- *Honest display:* "3 constraints checked, 1 presumed (attribute undeclared)" — the presumption label (ADR-0019 vocabulary) at the attribute level.
+- *Convergence engine:* absurd answers trace to the exact seam lacking the exact attribute (ADR-0025 §6 debug harness) → one added fact kills the absurdity class graph-wide. The vacuum-tube iPhone needed ONE attribute at ONE seam; that economy is typical, which is why CPU never needs a billion specs — it needs the handful some consumer actually checks.
+
 ## Interactions already pinned elsewhere
 
 - OR-branch pruning vs conditionality: a constraint-pruned branch contributes no path, so it cannot witness unconditionality (stress-test HANDLED finding 15 — "path" means solver path, constraints constitutive).

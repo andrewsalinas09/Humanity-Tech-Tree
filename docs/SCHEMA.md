@@ -48,7 +48,7 @@ IS_TYPE_OF poly-hierarchy is legal (H17). Effective requirements = AND across al
 | `truth_level` | enum EpistemicStatus (mainstream_fact → mythology) | ADR-0027 |
 | `validity` | enum ValidityStatus | ADR-0027 — disproven mechanisms between valid nodes |
 | `start_date`, `end_date` | DatePoint? | multiple active periods = multiple edges |
-| `constraints` | AttributeConstraint[] (GT/LT/EQ/CONTAINS) | ADR-0005 — consumer defines the need |
+| `constraints` | AttributeConstraint[] (GT/LT/EQ/CONTAINS) | ADR-0005 — consumer defines the need; undeclared provider attribute → passes as *presumed-satisfiable*, labeled (permissive-monotone default, TB-066) |
 | `optimization_factor` | OptimizationFactors? | trade-off deltas |
 | `shadowed_by_edge_ids` | edge_id[] | ADR-0021; re-validated on covering-edge change; exempt from implicit-AND (H12) |
 | `impact_weight` | float | subjective, labeled as such |
