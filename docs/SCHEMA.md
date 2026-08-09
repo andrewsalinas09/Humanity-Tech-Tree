@@ -112,7 +112,9 @@ assertions       (assertion_id,            -- = fact-log fact_id (stable, citabl
                   field_path,              -- e.g. base_attributes.melting_point / validity / start_date
                   value JSONB,
                   author, cr_id, recorded_at, superseded_by NULL)
-citations        (citation_id, claim_assertion_id, source_node, recorded_at, superseded_by)
+citations        (citation_id, claim_assertion_id, source_node,
+                  locator,                         -- page/section/table/DOI-anchor/timestamp (user ruling)
+                  recorded_at, superseded_by)
 verification_events (event_id, claim_assertion_id, kind,             -- l3_run | l4_confirm | vote |
                   actor, model_version, payload JSONB, recorded_at)  -- challenge | discredit | vouch | slash
 change_requests  (id, proposer, status, base_snapshot, assertion_ids[],
