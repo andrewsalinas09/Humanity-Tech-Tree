@@ -3,7 +3,7 @@
 Phases follow ADR-0016 (tree first; solver is Phase 4). This file always states the **current focus** — update it when the focus changes.
 
 ## Current focus
-**Phase 1 — schema lock via the test bed.** Work through `docs/TESTBED.md`: drive every OPEN/Partial case to Solved (design). Resolved so far: Q-01 (ADR-0017 expression trees), Q-18 (ADR-0018 version families), Q-06 (ADR-0021 shadowing), plus ADR-0019 (inheritance/exclusion) and ADR-0020 (additive specialization). Next up: Q-02 (truth-system overlap — now four mechanisms to reconcile), then the EdgeType enum reconciliation and remaining Partial cases (TB-011, TB-029, TB-031). Design changes happen HERE, on paper, where they're still cheap — that's the whole point of this phase.
+**Phase 1 COMPLETE pending user review of `docs/SCHEMA.md`** — the frozen v1 close-out: field definitions, Postgres physical design, JSONL fact log, snapshot permalinks, linter/breaker table, qualifier vocabulary, confidence formula sketch, MCP surface, implementation checklist. Achieved: 36 ADRs, 64 TESTBED cases all Solved, 0 breaks under a 17-agent adversarial stress test, backend ratified (ADR-0031). On sign-off: **Phase 2 build begins** — Postgres schema + fact log, MCP server, existence gate, read-only viewer, and the iPhone-all-the-way-up seed corridor.
 
 ## Phase 0 — Consolidation ✅ (2026-08-08)
 Doc system built; 10k lines of old chats distilled into ADRs, open questions, digests. Test bed established (2026-08-09).

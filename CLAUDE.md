@@ -11,6 +11,7 @@ A knowledge graph of all human technology and culture. Nodes are things (technol
 | File | Contains | Read when |
 |---|---|---|
 | `docs/VISION.md` | Why this exists, north-star goals | Starting any session |
+| `docs/SCHEMA.md` | **The frozen v1 schema** — fields, physical design, fact log, linters, MCP surface | Any implementation work; supersedes Node.cpp |
 | `docs/ARCHITECTURE.md` | Current-state design: data model, systems | Touching schema or design |
 | `docs/GLOSSARY.md` | Domain terms (abstract node, logic group, optimization edge…) | A term is unfamiliar |
 | `docs/decisions/` | One ADR per settled decision, with the *why* | Before proposing any design change |
