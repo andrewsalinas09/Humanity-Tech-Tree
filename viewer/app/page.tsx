@@ -242,7 +242,8 @@ export default function Home() {
   const [disp, setDisp] = useState<any | null>(null);   // {kind, subject, edge?}
   const [dForm, setDForm] = useState({ grounds: "", fix: "none",
                                        newType: "ENABLES", end: "to",
-                                       target: "", newCat: "TECHNOLOGY" });
+                                       target: "", newCat: "TECHNOLOGY",
+                                       newJust: "" });
   const EDGE_VERB: Record<string, (f: string, t: string, j: string) => any> = {
     ENABLES: (f, t, j) => ({ verb: "add_enabler", params: { enabled: t, enabler: f, justification: j } }),
     IS_COMPONENT_OF: (f, t, j) => ({ verb: "add_component", params: { whole: t, part: f, justification: j } }),
@@ -263,15 +264,23 @@ export default function Home() {
     const g = dForm.grounds.trim();
     if (disp.kind === "edge" && disp.edge) {
       const e = disp.edge;
+      // grounds = why the OLD claim is wrong (lives on the challenge);
+      // newJust = why the NEW claim is true (lives on the new edge).
+      // Never conflate them — an empty newJust births an honest red edge.
+      const nj = dForm.newJust.trim() || undefined;
       if (dForm.fix === "remove")
         remedy.push({ verb: "tombstone", params: { subject: disp.subject } });
       else if (dForm.fix === "retype") {
-        remedy.push(EDGE_VERB[dForm.newType](e.from, e.to, g));
+        const r = EDGE_VERB[dForm.newType](e.from, e.to, nj as any);
+        if (!nj) delete r.params.justification;
+        remedy.push(r);
         remedy.push({ verb: "tombstone", params: { subject: disp.subject } });
       } else if (dForm.fix === "reconnect" && dForm.target) {
         const f = dForm.end === "from" ? dForm.target : e.from;
         const t = dForm.end === "to" ? dForm.target : e.to;
-        remedy.push(EDGE_VERB[e.type](f, t, g));
+        const r = EDGE_VERB[e.type](f, t, nj as any);
+        if (!nj) delete r.params.justification;
+        remedy.push(r);
         remedy.push({ verb: "tombstone", params: { subject: disp.subject } });
       }
     } else if (disp.kind === "node") {
@@ -1131,6 +1140,10 @@ export default function Home() {
                   : <SearchBox compact placeholder="find the new endpoint…"
                       onPick={(r) => setDForm({ ...dForm, target: r.node_id })} />}
               </>)}
+              {(dForm.fix === "retype" || dForm.fix === "reconnect") && (
+                <textarea placeholder="Justification for the NEW edge (why the corrected claim is TRUE — not why the old one was wrong)"
+                          value={dForm.newJust} rows={2} style={S.input}
+                          onChange={(e) => setDForm({ ...dForm, newJust: e.target.value })} />)}
               {dForm.fix === "reclassify" && (
                 <select value={dForm.newCat} style={S.input}
                         onChange={(e) => setDForm({ ...dForm, newCat: e.target.value })}>
