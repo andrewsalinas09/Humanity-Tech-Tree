@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: httk-postgres
+    environment:
+      POSTGRES_PASSWORD: httk
+      POSTGRES_DB: httk
+    ports:
+      - "5433:5432"
+    volumes:
+      - httk_pgdata:/var/lib/postgresql/data
+volumes:
+  httk_pgdata:
