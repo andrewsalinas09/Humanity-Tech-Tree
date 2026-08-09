@@ -49,7 +49,9 @@ def layered_layout(view):
         span = min(340.0, 24.0 * max(k, 1))
         for i, n in enumerate(ordered):
             lng = 0.0 if k == 1 else (-span / 2 + span * i / (k - 1))
-            lat = LAT_MIN if max_layer == 0 else (
-                LAT_MIN + (LAT_MAX - LAT_MIN) * ly / max_layer)
+            # User ruling: foundations at the TOP, derived tech descending —
+            # the iPhone sits at the bottom of everything it rests on.
+            lat = LAT_MAX if max_layer == 0 else (
+                LAT_MAX - (LAT_MAX - LAT_MIN) * ly / max_layer)
             pos[n] = (max(LNG_MIN, min(LNG_MAX, lng)), lat, ly)
     return pos

@@ -16,9 +16,10 @@ def _world():
 
 
 def test_latitude_is_dependency_altitude():
-    """Foundations south, consumers north — the tree grows up the map."""
+    """Foundations at the TOP, derived tech descending (user ruling) —
+    the iPhone sits at the bottom of everything it rests on."""
     pos = layered_layout(View(_world()))
-    assert pos["silicon"][1] < pos["transistor"][1] < pos["cpu"][1] < pos["iphone"][1]
+    assert pos["silicon"][1] > pos["transistor"][1] > pos["cpu"][1] > pos["iphone"][1]
     assert pos["silicon"][2] == 0 and pos["iphone"][2] == 3      # layers
 
 

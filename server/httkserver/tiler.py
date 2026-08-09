@@ -100,7 +100,11 @@ def tile(z: int, x: int, y: int):
             continue
         pa = _lnglat_to_tilepx(a[0], a[1], z, x, y)
         pb = _lnglat_to_tilepx(b[0], b[1], z, x, y)
-        if all(p < -EXTENT or p > 2 * EXTENT for p in (pa[0], pb[0])):
+        # segment-bbox vs tile-bbox (1-tile buffer) — endpoint tests broke
+        # long edges mid-tile at zoom (user-reported bug)
+        lo_x, hi_x = min(pa[0], pb[0]), max(pa[0], pb[0])
+        lo_y, hi_y = min(pa[1], pb[1]), max(pa[1], pb[1])
+        if hi_x < -EXTENT or lo_x > 2 * EXTENT or hi_y < -EXTENT or lo_y > 2 * EXTENT:
             continue
         edges_feats.append({
             "geometry": {"type": "LineString", "coordinates": [list(pa), list(pb)]},
@@ -146,47 +150,77 @@ def solve(node_id: str, world_time: float = None, region: str = None):
             "gaps": r.gaps, "unfit": r.unfit}
 
 
+@app.get("/search")
+def search(q: str):
+    """Name/alias search → positions, for the upper-right search box."""
+    st = _state()
+    view, pos = st["view"], st["pos"]
+    ql = q.lower()
+    hits = []
+    for n in view.nodes():
+        names = [n, view.field(n, "name") or ""] + (view.field(n, "aliases", []) or [])
+        if any(ql in str(x).lower() for x in names if x):
+            p = pos.get(n)
+            hits.append({"node_id": n, "name": view.field(n, "name") or n,
+                         "lng": p[0] if p else 0, "lat": p[1] if p else 0})
+    return {"hits": hits[:10]}
+
+
+# The trust visual language on a WHITE world (user ruling). Nodes render as
+# little books (client-registered images 'book' + 'book-ring'); selection
+# dimming rides feature-state 'dim' set by the viewer.
+DIM = ["case", ["boolean", ["feature-state", "dim"], False]]
+
+
 @app.get("/style.json")
 def style():
-    """MapLibre style: the trust visual language as tokens (docs/COORDINATES.md)."""
     base = os.environ.get("HTT_TILER_URL", "http://localhost:8748")
     cat_colors = ["match", ["get", "category"],
-                  "NATURAL_LAW", "#7c5cff", "FORMAL_CONCEPT", "#9d7bff",
-                  "MATERIAL", "#8a6d3b", "METHOD_TECHNIQUE", "#2a9d8f",
-                  "STANDARD_UNIT", "#457b9d", "CAPABILITY", "#e9c46a",
-                  "BIOLOGICAL_ENTITY", "#f4a261", "ORGANIZATION", "#e76f51",
-                  "WORK_PUBLICATION", "#b5838d", "#3a86ff"]
+                  "NATURAL_LAW", "#6d4fd8", "FORMAL_CONCEPT", "#8b5fd6",
+                  "MATERIAL", "#8a6d3b", "METHOD_TECHNIQUE", "#1d8a7e",
+                  "STANDARD_UNIT", "#3e6f95", "CAPABILITY", "#c99a2e",
+                  "BIOLOGICAL_ENTITY", "#d97f3f", "ORGANIZATION", "#cf5f3f",
+                  "WORK_PUBLICATION", "#a06a76", "#2f6fd0"]
     return {
         "version": 8,
         "name": "Humanity Tech Tree",
         "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         "sources": {"httk": {"type": "vector",
                              "tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.mvt"],
-                             "minzoom": 0, "maxzoom": 14}},
+                             "minzoom": 0, "maxzoom": 14,
+                             "promoteId": {"nodes": "node_id",
+                                           "edges": "edge_id"}}},
         "layers": [
             {"id": "bg", "type": "background",
-             "paint": {"background-color": "#0b0e14"}},
+             "paint": {"background-color": "#ffffff"}},
             {"id": "edges", "type": "line", "source": "httk", "source-layer": "edges",
              "filter": ["!", ["get", "ghost"]],
-             "paint": {"line-color": ["case", ["get", "shadowed"], "#39424e",
-                                      "#5b8dd9"],
-                       "line-width": 1.4, "line-opacity": 0.8,
+             "paint": {"line-color": ["case", ["get", "shadowed"], "#b9c2cf",
+                                      "#7d9bc4"],
+                       "line-width": 1.6,
+                       "line-opacity": [*DIM, 0.08, 0.85],
                        "line-dasharray": ["case", ["get", "shadowed"],
                                           ["literal", [2, 2]], ["literal", [1, 0]]]}},
-            {"id": "node-red-ring", "type": "circle", "source": "httk",
+            {"id": "node-ring", "type": "symbol", "source": "httk",
              "source-layer": "nodes", "filter": ["!", ["get", "cited"]],
-             "paint": {"circle-radius": 11, "circle-color": "rgba(0,0,0,0)",
-                       "circle-stroke-color": "#e63946", "circle-stroke-width": 2.5}},
-            {"id": "nodes", "type": "circle", "source": "httk", "source-layer": "nodes",
-             "paint": {"circle-radius": 7, "circle-color": cat_colors,
-                       "circle-opacity": ["match", ["get", "validity"],
-                                          "unassessed", 0.35, "hypothetical", 0.5, 1.0],
-                       "circle-stroke-color": "#0b0e14", "circle-stroke-width": 1.5}},
-            {"id": "labels", "type": "symbol", "source": "httk", "source-layer": "nodes",
-             "layout": {"text-field": ["get", "name"], "text-size": 12,
-                        "text-offset": [0, 1.4], "text-anchor": "top"},
-             "paint": {"text-color": "#dbe4f0", "text-halo-color": "#0b0e14",
-                       "text-halo-width": 1.2}},
+             "layout": {"icon-image": "book-ring", "icon-size": 1.0,
+                        "icon-allow-overlap": True},
+             "paint": {"icon-opacity": [*DIM, 0.08, 1.0]}},
+            {"id": "nodes", "type": "symbol", "source": "httk",
+             "source-layer": "nodes",
+             "layout": {"icon-image": "book", "icon-size": 1.0,
+                        "icon-allow-overlap": True,
+                        "text-field": ["get", "name"], "text-size": 12,
+                        "text-offset": [0, 2.1], "text-anchor": "top",
+                        "text-optional": True},
+             "paint": {"icon-color": cat_colors,
+                       "icon-opacity": [*DIM, 0.08,
+                                        ["match", ["get", "validity"],
+                                         "unassessed", 0.45,
+                                         "hypothetical", 0.55, 1.0]],
+                       "text-color": "#1b2432",
+                       "text-opacity": [*DIM, 0.1, 1.0],
+                       "text-halo-color": "#ffffff", "text-halo-width": 1.4}},
         ],
-        "center": [0, 0], "zoom": 2,
+        "center": [0, 20], "zoom": 2,
     }
