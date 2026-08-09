@@ -412,6 +412,44 @@ def set_constraint(view, edge_id, attr, op, value, class_="FITNESS", citation=No
 
 # ================= texture verbs (every schema field is authorable) ==========
 
+def set_effect(view, edge_id, attr, op, value, justification=None):
+    """ADR-0052: a process's declared delivery rides its output edge —
+    {attr, op: SET|ADD|MULTIPLY, value}. SET = rated output (extraction and
+    producers included: mining Spruce Pine SETs quartz purity); relative ops
+    transform an upstream SET and stay dark without one (the keystone)."""
+    if view.edge(edge_id) is None:
+        return Rejection("E404", f"edge {edge_id} unknown")
+    if op not in ("SET", "ADD", "MULTIPLY"):
+        return Rejection("ADR-0052", "op must be SET | ADD | MULTIPLY")
+    effs = list(view.field(edge_id, "effect", []) or [])
+    effs.append({"attr": attr, "op": op, "value": value})
+    facts = [("assert", {"subject": edge_id, "field": "effect", "value": effs})]
+    if justification:
+        facts.append(("assert", {"subject": edge_id, "field": "justification",
+                                 "value": justification}))
+    return StagedFacts(facts)
+
+
+def add_optimizer(view, target, process, attr, op, value,
+                  edge_id=None, justification=None):
+    """ADR-0052 loop-closer: process → (OPTIMIZES, effect) → target. The
+    same material went in and comes out improved; only THIS back-edge is
+    OPTIMIZES (internal loop edges are ordinary)."""
+    if (r := _endpoints_exist(view, target, process)):
+        return r
+    if op not in ("SET", "ADD", "MULTIPLY"):
+        return Rejection("ADR-0052", "op must be SET | ADD | MULTIPLY")
+    eid = edge_id or _fresh_eid(view, f"o_{process}_{target}")
+    facts = [("edge.create", {"edge_id": eid, "from": process, "to": target,
+                              "type": "OPTIMIZES", "qualifier": None}),
+             ("assert", {"subject": eid, "field": "effect",
+                         "value": [{"attr": attr, "op": op, "value": value}]})]
+    if justification:
+        facts.append(("assert", {"subject": eid, "field": "justification",
+                                 "value": justification}))
+    return StagedFacts(facts)
+
+
 def set_attribute(view, node_id, attr, value):
     """Declare a node's attribute value (ADR-0004). Name canonicalization is the
     Q-20 gate's job upstream; the compiler is mechanical."""

@@ -393,6 +393,7 @@ def edge_card(edge_id: str):
         "constraints": view.field(edge_id, "constraints", []) or [],
         "shadowed_by": view.shadowed_by(edge_id),
         "citation": view.field(edge_id, "citation"),
+        "effect": view.field(edge_id, "effect", []) or [],
         "provenance": ({"by": row[0], "at": row[1].date().isoformat()}
                        if row else None),
     }
@@ -437,7 +438,7 @@ def solve(node_id: str, world_time: float = None, region: str = None):
     view = _state()["view"]
     r = realizable(view, node_id, world_time=world_time, region=region)
     return {"existence": r.existence.value, "fitness": r.fitness.value,
-            "gaps": r.gaps, "unfit": r.unfit}
+            "gaps": r.gaps, "unfit": r.unfit, "via": r.via}
 
 
 @app.get("/search")

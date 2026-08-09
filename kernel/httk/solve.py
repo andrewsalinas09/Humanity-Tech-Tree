@@ -25,8 +25,82 @@ class Result:
     fitness: Tri
     gaps: list = field(default_factory=list)     # (subject, why) for every UNKNOWN
     unfit: list = field(default_factory=list)    # (edge_id, constraint) for FITNESS VIOLs
+    via: list = field(default_factory=list)      # ADR-0052 one-hop capability routes
     def pair(self):
         return (self.existence, self.fitness)
+
+
+# -- capability fixpoint (ADR-0052): every value is a process's SET -----------
+
+UNBOUNDED = "UNBOUNDED"     # relative op with a base: iterate the loop as needed
+
+
+def capabilities(view):
+    """Least fixpoint over effect-carrying edges (ADR-0052, TB-072/073).
+    Returns {(material, attr): (value | UNBOUNDED, process, edge_id)}.
+    - effects ride any process→product edge: [{attr, op: SET|ADD|MULTIPLY, value}]
+    - a process LIGHTS when every attribute request on its input edges is met
+      by currently-achievable values; extraction SETs need no inputs (always
+      light) — the floor of the fixpoint is the earth
+    - self-feeding is legal; lighting requires a bootstrap path; once lit,
+      latched (monotone ⇒ unique fixpoint, ADR-0023 by construction)
+    - relative ops (ADD/MULTIPLY) with a base become UNBOUNDED in the
+      improving direction ("run the loop as many times as needed"); with NO
+      base they stay dark — a SET-producing process is missing (the keystone:
+      same diagnosis as the dark loop, bountyable)."""
+    effects = []
+    for e in view._edges.values():
+        for eff in (view.field(e["edge_id"], "effect", []) or []):
+            effects.append((e["from"], e["to"], e["edge_id"], eff))
+    cap = {}
+
+    def achieved(node, attr):
+        got = cap.get((node, attr))
+        if got is not None:
+            return got[0]
+        return view.field(node, f"attrs.{attr}")   # legacy/simple attrs
+
+    def lit(proc):
+        for e in view.edges_in(proc):
+            for c in view.field(e["edge_id"], "constraints", []) or []:
+                v = achieved(e["from"], c["attr"])
+                if v is None:
+                    return False
+                if v is not UNBOUNDED and not _cmp(v, c["op"], c["value"]):
+                    return False
+        return True
+
+    changed = True
+    while changed:
+        changed = False
+        for proc, mat, eid, eff in effects:
+            if not lit(proc):
+                continue
+            attr, op = eff["attr"], eff["op"]
+            if op == "SET":
+                v = eff["value"]
+            else:                                   # ADD | MULTIPLY
+                base = achieved(mat, attr)
+                if base is None:
+                    continue                        # keystone: SET missing
+                v = UNBOUNDED
+            cur = cap.get((mat, attr))
+            if cur is None or _better(v, cur[0]):
+                cap[(mat, attr)] = (v, proc, eid)
+                changed = True
+    return cap
+
+
+def _cmp(val, op, target):
+    return {"GT": val > target, "LT": val < target, "EQ": val == target}[op]
+
+
+def _better(new, old):
+    if old is UNBOUNDED:
+        return False
+    if new is UNBOUNDED:
+        return True
+    return new > old        # monotone-improving convention (higher = better)
 
 
 # -- effective requirement expression (own + implicit-AND + inherited) --------
@@ -105,19 +179,45 @@ def _prune_excluded(expr, excludes):
 # -- constraint evaluation (ADR-0039 two classes; TB-066 UNKNOWN) --------------
 
 def _check_constraints(view, edge, gaps, unfit):
-    """Returns (existence_tri, fitness_tri) from this edge's constraints, evaluated
-    against the edge's own provider (TB-067: constraints ride the claim)."""
+    """Returns (existence_tri, fitness_tri) from this edge's constraints,
+    evaluated against the provider's ACHIEVABLE values (ADR-0052 capability
+    fixpoint) with declared attrs as the legacy/simple fallback (TB-067:
+    constraints ride the claim). Satisfied-via-process appends a one-hop
+    trace entry; insufficient capability is an UNKNOWN gap naming the
+    nearest rung — a further process is missing, never 'impossible'."""
     ex, fit = [Tri.SAT], [Tri.SAT]
-    for c in view.field(edge["edge_id"], "constraints", []) or []:
-        val = view.field(edge["from"], f"attrs.{c['attr']}")
-        if val is None:
-            (gaps).append((edge["edge_id"], f"attribute '{c['attr']}' undeclared on {edge['from']}"))
-            tri = Tri.UNKNOWN                       # TB-066: never a silent pass
-        else:
-            ok = {"GT": val > c["value"], "LT": val < c["value"],
-                  "EQ": val == c["value"]}[c["op"]]
+    cons = view.field(edge["edge_id"], "constraints", []) or []
+    if not cons:
+        return t_and(ex), t_and(fit)
+    cap = getattr(view, "_capability_cache", None)
+    if cap is None:
+        cap = capabilities(view)
+        view._capability_cache = cap
+    for c in cons:
+        got = cap.get((edge["from"], c["attr"]))
+        declared = view.field(edge["from"], f"attrs.{c['attr']}")
+        if got is not None:
+            v, proc, veid = got
+            if v is UNBOUNDED or _cmp(v, c["op"], c["value"]):
+                tri = Tri.SAT
+                getattr(view, "_solve_via", []).append(
+                    {"edge": edge["edge_id"], "attr": c["attr"],
+                     "via": proc, "via_edge": veid,
+                     "value": None if v is UNBOUNDED else v})
+            else:
+                tri = Tri.UNKNOWN               # nearest missing rung, bountyable
+                gaps.append((edge["edge_id"],
+                             f"'{c['attr']}' reaches {v} via {proc} — short of "
+                             f"{c['op']} {c['value']}; a further process is "
+                             "missing from the map"))
+        elif declared is not None:              # inherent/simple attribute
+            ok = _cmp(declared, c["op"], c["value"])
             tri = Tri.SAT if ok else Tri.VIOL
-        if c.get("class", "FITNESS") == "PHYSICAL":  # FITNESS is the default (ADR-0039)
+        else:
+            gaps.append((edge["edge_id"],
+                         f"attribute '{c['attr']}' undeclared on {edge['from']}"))
+            tri = Tri.UNKNOWN                   # TB-066: never a silent pass
+        if c.get("class", "FITNESS") == "PHYSICAL":  # FITNESS default (ADR-0039)
             ex.append(tri)
         else:
             fit.append(tri)
@@ -130,20 +230,27 @@ def _check_constraints(view, edge, gaps, unfit):
 
 def realizable(view, node_id, world_time=None, region=None, _stack=frozenset()):
     """Two-axis realizability of node_id at (world_time, region), possibility mode."""
+    if not _stack:                      # depth 0: fresh one-hop via trace
+        view._solve_via = []
+
+    def _fin(r):
+        if not _stack:
+            r.via = list(getattr(view, "_solve_via", []))
+        return r
     node_id = view.resolve_redirect(node_id)
     node = view.node(node_id)
     gaps, unfit = [], []
     if node is None:
-        return Result(Tri.UNKNOWN, Tri.UNKNOWN, [(node_id, "stub: node unknown")], [])
+        return _fin(Result(Tri.UNKNOWN, Tri.UNKNOWN, [(node_id, "stub: node unknown")], []))
     if node_id in _stack:
         # A hard dependency cycle reached us (B1 should have caught it at apply).
-        return Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "dependency cycle")], [])
+        return _fin(Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "dependency cycle")], []))
 
     # ADR-0042: no fallback to current_truth — absent validity is UNASSESSED
     # and standing builds from zero (existence caps at UNKNOWN below).
     validity = view.field(node_id, "validity")
     if validity == "disproven":
-        return Result(Tri.VIOL, Tri.SAT, [], [])
+        return _fin(Result(Tri.VIOL, Tri.SAT, [], []))
 
     expr = effective_expr(view, node_id)
 
@@ -159,16 +266,16 @@ def realizable(view, node_id, world_time=None, region=None, _stack=frozenset()):
             elif validity is None and ex is Tri.SAT:
                 ex = Tri.UNKNOWN                    # ADR-0042: builds from zero
                 gaps.append((node_id, "validity unassessed"))
-            return Result(ex, fit_expr if fit_expr is not None else Tri.SAT, gaps, unfit)
+            return _fin(Result(ex, fit_expr if fit_expr is not None else Tri.SAT, gaps, unfit))
 
     # Magic-box leaf (graceful ignorance) — but TB-041: hypothetical validity
     # blocks realization regardless of parents (no false unlocks), and
     # ADR-0042: unassessed validity confers no standing either.
     if validity == "hypothetical":
-        return Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "hypothetical, no realization")], [])
+        return _fin(Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "hypothetical, no realization")], []))
     if validity is None:
-        return Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "validity unassessed")], [])
-    return Result(Tri.SAT, Tri.SAT, gaps, unfit)
+        return _fin(Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "validity unassessed")], []))
+    return _fin(Result(Tri.SAT, Tri.SAT, gaps, unfit))
 
 
 def _eval(view, expr, world_time, region, _stack):

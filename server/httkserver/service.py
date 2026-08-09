@@ -42,6 +42,8 @@ VERBS = {
     "widen": (VB.widen, False),
     "merge": (VB.merge, False),
     "set_constraint": (VB.set_constraint, False),
+    "set_effect": (VB.set_effect, False),
+    "add_optimizer": (VB.add_optimizer, False),
     "set_attribute": (VB.set_attribute, False),
     "add_time_segment": (VB.add_time_segment, False),
     "date_edge": (VB.date_edge, False),
@@ -237,7 +239,7 @@ class Service:
         _, view = self._kernel()
         r = realizable(view, node_id, world_time=world_time, region=region)
         return {"existence": r.existence.value, "fitness": r.fitness.value,
-                "gaps": r.gaps, "unfit": r.unfit}
+                "gaps": r.gaps, "unfit": r.unfit, "via": r.via}
 
     def get_edge(self, token, edge_id):
         """An edge's endpoints and texture — never guess endpoints from ids

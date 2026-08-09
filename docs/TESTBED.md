@@ -304,11 +304,11 @@ Galaxy is added long after iPhone; they share nearly every provider. Later someo
 
 ### TB-072 — The purity bootstrap chain (dirt to chip)
 mining → quartz (as-found) → carbothermic smelting ⇒ silicon@0.98 → Siemens (requests ≥0.98) ⇒ silicon@6N → transistor (requests >5N). The solver must light the chain by fixpoint (smelter → Siemens → request met VIA the chain, trace naming each process), and removing the smelter must honestly darken everything above.
-**Stresses:** fixpoint order-independence (ADR-0023); trace shape; producer-edge bookkeeping (pending). **Answer:** ADR-0052 semantics; implementation pending Q-25 rulings. **Status:** OPEN (design ruled; acceptance case for the solver build).
+**Stresses:** fixpoint order-independence (ADR-0023); trace shape; producer-edge bookkeeping. **Answer:** ADR-0052 implemented — `capabilities()` least fixpoint + one-hop via traces; live chain solves SATISFIED with via=[mining, siemens-process]. **Status:** Solved (implemented + acceptance-tested, kernel test_capabilities).
 
 ### TB-073 — The self-feeding loop with no bootstrap stays dark
 A process whose only input source is its own output (Siemens with the smelter deleted from history). Self-feeding is LEGAL (latched loops sustain themselves); lighting without a bootstrap path is not. The dark loop must surface as a diagnosis — "assumption missing: what first produced ≥98% silicon?" — a named, bountyable gap, never a silent pass and never an exclusion hack.
-**Stresses:** least-fixpoint honesty; gap wording; the difference between sustaining and bootstrapping. **Status:** OPEN (acceptance case for the solver build).
+**Stresses:** least-fixpoint honesty; gap wording; sustaining vs bootstrapping. **Status:** Solved (implemented: severed bootstrap → dark, UNKNOWN with named gap; test_tb073).
 
 ### TB-074 — The fiat attribute (the seed's silicon lie, caught live)
 Seed data declared silicon purity 0.999999 with no purification process anywhere; solve(transistor) said SATISFIED. Structurally undetectable as false — editorially poisonous. Retracted 2026-08-09 with reasons.
@@ -316,7 +316,7 @@ Seed data declared silicon purity 0.999999 with no purification process anywhere
 
 ### TB-075 — Iterative passes (zone refining runs the loop N times)
 Some optimizers reach their value asymptotically over repeated passes ("go around the loop as many times as needed"). Capability = the limit; pass count/time/cost = economics (fitness axis, deferred). Relative ops (MULTIPLY per pass) with undeclared base must evaluate UNKNOWN, never a guess.
-**Stresses:** SET vs relative ops; capability/economics boundary. **Status:** OPEN (pending Q-25 ops ruling).
+**Stresses:** SET vs relative ops; capability/economics boundary. **Answer:** relative ops with a base become UNBOUNDED (iterate as needed); without a base stay dark (keystone). **Status:** Solved (implemented; test_tb075).
 
 ### TB-076 — One steel, a thousand grades (the D2 question)
 "1 steel — how do you get to 440 stainless, D2, Elmax? Each has its own process. How do we make 'D2 steel' searchable without the digikey problem? Maybe it DOES have to be added." The boundary is exactly ADR-0004's Manufacturing Test: purity is a CONTINUUM on one material (attribute + optimizers), but alloy grades are DISCRETE different recipes — different bills of materials (Cr, V, Mo), different processes — so D2/440/Elmax PASS the test and ARE nodes: grade instances under a `steel` family (IS_TYPE_OF), each with its own producer process and effects, inheriting the family's shared deps (ADR-0019). Searchability = the family + aliases + descriptions through the ADR-0048 semantic gate ("tool steel for dies" should find D2). The digikey failure mode — ten thousand undifferentiated SKUs — is prevented by the Significance Filter (grades with real recipe/process identity are nodes; vendor SKUs of the same grade are NOT) and by family grouping.

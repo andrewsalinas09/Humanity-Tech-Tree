@@ -27,7 +27,8 @@ type Card = {
   story: EdgeView[]; missing?: string;
   versions?: { node_id: string; year: number }[];
 };
-type Solve = { existence: string; fitness: string; gaps: [string, string][] };
+type Solve = { existence: string; fitness: string; gaps: [string, string][];
+  via?: { edge: string; attr: string; via: string; value?: number | null }[] };
 
 const existenceWords: Record<string, [string, string]> = {
   SATISFIED: ["Provable from recorded dependencies", "#19715f"],
@@ -1168,6 +1169,16 @@ export default function Home() {
                   📖 {edgeCard.citation.source}
                   {edgeCard.citation.locator ? ` — ${edgeCard.citation.locator}` : ""}
                 </div>}
+              {(edgeCard.effect ?? []).length > 0 && (
+                <div style={{ fontSize: 12.5, margin: "4px 0" }}>
+                  {edgeCard.effect.map((f: any, i: number) => (
+                    <span key={i} style={{ display: "inline-block",
+                        marginRight: 6, padding: "1px 8px", borderRadius: 8,
+                        background: "#fdf6e9", border: "1px solid #e8d9b8",
+                        color: "#7a5c2e", fontSize: 11.5 }}>
+                      ⚙ delivers {f.attr} {f.op === "SET" ? "=" : f.op} {f.value}
+                    </span>))}
+                </div>)}
               {edgeCard.shadowed_by.length > 0 &&
                 <div style={{ fontSize: 12, opacity: 0.65 }}>
                   shadowed by: {edgeCard.shadowed_by.join(", ")} (covered history)
@@ -1302,6 +1313,19 @@ export default function Home() {
                                 fontSize: 13 }}>
                     {fitnessWords[solve.fitness]?.[0] ?? solve.fitness}
                   </div>
+                  {(solve.via ?? []).length > 0 && (
+                    <div style={{ fontSize: 12.5, margin: "6px 0",
+                                  color: "#19715f" }}>
+                      {solve.via!.map((v, i) => (
+                        <div key={i}>
+                          ⚙ {v.attr} met via{" "}
+                          <span style={S.link}
+                                onClick={() => mapRef.current &&
+                                  focusOn(mapRef.current, v.via)}>
+                            {v.via}</span>
+                          {v.value != null ? ` (${v.value})` : " (iterable)"}
+                        </div>))}
+                    </div>)}
                   {solve.gaps.length > 0 && (
                     <details open>
                       <summary style={{ color: "#b8860b", cursor: "pointer" }}>

@@ -92,3 +92,9 @@ H5: compiles the forward-edit redirect reversal. Then computes the triage set: a
 
 ### `extract_family(parent, siblings, hoist_choice?, justification?)`
 The late-arriving taxonomy parent (ADR-0050, TB-071). Parent must exist; ≥2 siblings. Computes claims shared by ALL siblings → Decision ticket with grouped bulk options (`hoist_all` / `hoist_except{exclude:[...]}` / `hoist_only{include:[...]}` / `hoist_none`); resolution compiles to IS_TYPE_OF classifies + family edges on the parent (ADR-0019 inheritable defaults) + `shadowed_by` on covered instance edges. Non-hoisted claims stay at instances. The pick + justification are recorded forever.
+
+### `set_effect(edge_id, attr, op, value, justification?)`
+ADR-0052: a process's declared delivery rides its output edge — `{attr, op: SET|ADD|MULTIPLY, value}`. SET = rated output (extraction and producers included: mining Spruce Pine SETs quartz purity). Relative ops transform an upstream SET and stay dark without one.
+
+### `add_optimizer(target, process, attr, op, value, edge_id?, justification?)`
+ADR-0052 loop-closer: creates `process →(OPTIMIZES, effect)→ target` atomically. Only the back-edge into the same material is OPTIMIZES; internal loop edges are ordinary.
