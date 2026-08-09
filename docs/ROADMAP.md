@@ -35,3 +35,6 @@ This is an architecture + scale problem: most remaining gaps will surface throug
 ## Phase 5 — Scale
 - Storage engine decision at real data volumes (Q-17; ~TB-scale estimate), ingestion generators (Q-11), embedding services, LOD (Q-15), transitive-redundancy maintenance (Q-06).
 - Community launch: bounty/flag gameplay on the home page.
+
+## Standing note: the UI redesign (ruled 2026-08-09)
+The current viewer is a **feature-testing scaffold** — deliberately cheap (prompts, minimal forms) so the server surface gets exercised and gaps get found. A **100% UI redesign is planned** before public launch. Priority framing (user): "UI is the second most important thing for functionality and the SINGLE most important thing for adoption." The redesign is a from-scratch design project with its own research pass; the REST/MCP surfaces are its stable contract.
