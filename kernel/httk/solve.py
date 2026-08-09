@@ -139,7 +139,9 @@ def realizable(view, node_id, world_time=None, region=None, _stack=frozenset()):
         # A hard dependency cycle reached us (B1 should have caught it at apply).
         return Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "dependency cycle")], [])
 
-    validity = view.field(node_id, "validity", "current_truth")
+    # ADR-0042: no fallback to current_truth — absent validity is UNASSESSED
+    # and standing builds from zero (existence caps at UNKNOWN below).
+    validity = view.field(node_id, "validity")
     if validity == "disproven":
         return Result(Tri.VIOL, Tri.SAT, [], [])
 
@@ -154,12 +156,18 @@ def realizable(view, node_id, world_time=None, region=None, _stack=frozenset()):
             if validity == "hypothetical" and ex is Tri.SAT:
                 ex = Tri.UNKNOWN                    # TB-041 cap
                 gaps.append((node_id, "hypothetical: not realized even with deps met"))
+            elif validity is None and ex is Tri.SAT:
+                ex = Tri.UNKNOWN                    # ADR-0042: builds from zero
+                gaps.append((node_id, "validity unassessed"))
             return Result(ex, fit_expr if fit_expr is not None else Tri.SAT, gaps, unfit)
 
     # Magic-box leaf (graceful ignorance) — but TB-041: hypothetical validity
-    # blocks realization regardless of parents (no false unlocks).
+    # blocks realization regardless of parents (no false unlocks), and
+    # ADR-0042: unassessed validity confers no standing either.
     if validity == "hypothetical":
         return Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "hypothetical, no realization")], [])
+    if validity is None:
+        return Result(Tri.UNKNOWN, Tri.SAT, [(node_id, "validity unassessed")], [])
     return Result(Tri.SAT, Tri.SAT, gaps, unfit)
 
 
@@ -277,7 +285,7 @@ def contradictions(view):
     (the graph can prove no support) — a missing-node bounty, never a paradox."""
     out = []
     for n in view.nodes():
-        if view.field(n, "validity", "current_truth") == "current_truth":
+        if view.field(n, "validity") == "current_truth":   # explicit only (ADR-0042)
             r = realizable(view, n)
             if r.existence is Tri.VIOL:
                 out.append((n, "proven-true but no valid support path: missing nodes"))

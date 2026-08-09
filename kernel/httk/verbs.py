@@ -59,7 +59,23 @@ def _shares_ancestor(view, a, b):
     return bool((_ancestors(view, a) | {a}) & (_ancestors(view, b) | {b}))
 
 
-def _add_or_alternative(view, consumer, new_edge, role):
+def _edge_extras(edge_id, start=None, end=None, epistemic=None, justification=None):
+    """Q1 (ADR-0042 §3): initial conditions compiled at birth — one atomic CR.
+    Anything unstated starts at zero, honestly labeled (unassessed/undated/red)."""
+    facts = []
+    if start is not None:
+        facts.append(("assert", {"subject": edge_id, "field": "start_date", "value": start}))
+    if end is not None:
+        facts.append(("assert", {"subject": edge_id, "field": "end_date", "value": end}))
+    if epistemic is not None:
+        facts.append(("assert", {"subject": edge_id, "field": "epistemic", "value": epistemic}))
+    if justification is not None:
+        facts.append(("assert", {"subject": edge_id, "field": "justification",
+                                 "value": justification}))
+    return facts
+
+
+def _add_or_alternative(view, consumer, new_edge, role, extras=None):
     """The L11 trigger: same-type edge into consumer whose provider shares a
     taxonomy ancestor with the new provider ⇒ role REQUIRED."""
     siblings = [e for e in view.edges_in(consumer, {new_edge["type"]})
@@ -71,7 +87,7 @@ def _add_or_alternative(view, consumer, new_edge, role):
             options=[{"key": "additional"},
                      *({"key": "alternative", "to": e["edge_id"]} for e in siblings)],
             evidence={"siblings": [e["edge_id"] for e in siblings]})
-    facts = [("edge.create", new_edge)]
+    facts = [("edge.create", new_edge)] + (extras or [])
     if isinstance(role, dict) and role.get("alternative"):
         other = role["alternative"]
         expr = view.field(consumer, "requirement_expr")
@@ -91,23 +107,30 @@ def _cat(view, node_id):
 
 # ------------------------------------------------------- role-named verbs ----
 
-def add_component(view, whole, part, role=None, edge_id=None):
+def add_component(view, whole, part, role=None, edge_id=None,
+                 start=None, end=None, epistemic=None, justification=None):
     if _cat(view, part) in PEOPLE_ORGS:
         return Rejection("L5", f"{part} is a person/org — people are never parts")
-    e = {"edge_id": edge_id or f"e_{part}_{whole}", "from": part, "to": whole,
+    eid = edge_id or f"e_{part}_{whole}"
+    e = {"edge_id": eid, "from": part, "to": whole,
          "type": "IS_COMPONENT_OF", "qualifier": None}
-    return _add_or_alternative(view, whole, e, role)
+    return _add_or_alternative(view, whole, e, role,
+                               _edge_extras(eid, start, end, epistemic, justification))
 
 
-def add_ingredient(view, product, ingredient, role=None, edge_id=None):
+def add_ingredient(view, product, ingredient, role=None, edge_id=None,
+                   start=None, end=None, epistemic=None, justification=None):
     if _cat(view, ingredient) in PEOPLE_ORGS:
         return Rejection("L5", f"{ingredient} is a person/org — never an ingredient")
-    e = {"edge_id": edge_id or f"e_{ingredient}_{product}", "from": ingredient,
+    eid = edge_id or f"e_{ingredient}_{product}"
+    e = {"edge_id": eid, "from": ingredient,
          "to": product, "type": "IS_INGREDIENT_OF", "qualifier": None}
-    return _add_or_alternative(view, product, e, role)
+    return _add_or_alternative(view, product, e, role,
+                               _edge_extras(eid, start, end, epistemic, justification))
 
 
-def add_enabler(view, enabled, enabler, justification=None, edge_id=None):
+def add_enabler(view, enabled, enabler, justification=None, edge_id=None,
+                start=None, end=None, epistemic=None):
     notes = []
     if _cat(view, enabler) == "WORK_PUBLICATION" and _cat(view, enabled) not in PEOPLE_ORGS:
         notes.append("L1: depend on the concept the work codifies, not the paper")
@@ -118,9 +141,47 @@ def add_enabler(view, enabled, enabler, justification=None, edge_id=None):
             return Rejection("L3", "direct person link: justification required "
                                    "(substitutability default is 99.9% no)")
         notes.append("L3: direct person link — review-flagged")
-    e = {"edge_id": edge_id or f"e_{enabler}_{enabled}", "from": enabler,
-         "to": enabled, "type": "ENABLES", "qualifier": None}
-    return StagedFacts([("edge.create", e)], notes)
+    eid = edge_id or f"e_{enabler}_{enabled}"
+    e = {"edge_id": eid, "from": enabler, "to": enabled, "type": "ENABLES",
+         "qualifier": None}
+    return StagedFacts([("edge.create", e)]
+                       + _edge_extras(eid, start, end, epistemic, justification), notes)
+
+
+def refine(view, family, version, edge_id=None,
+           start=None, end=None, epistemic=None, justification=None):
+    """version IS_REFINEMENT_OF family — the flat star (ADR-0018)."""
+    notes = []
+    cf, cv = _cat(view, family), _cat(view, version)
+    if cf and cv and cf != cv:
+        return Rejection("L4", "IS_REFINEMENT_OF requires same category")
+    if view.edges_out(family, {"IS_REFINEMENT_OF"}):
+        notes.append("ADR-0018: family is itself a version — flat star wants the root")
+    eid = edge_id or f"r_{version}_{family}"
+    e = {"edge_id": eid, "from": version, "to": family,
+         "type": "IS_REFINEMENT_OF", "qualifier": None}
+    return StagedFacts([("edge.create", e)]
+                       + _edge_extras(eid, start, end, epistemic, justification), notes)
+
+
+def succeed(view, old, new, qualifier, edge_id=None,
+            start=None, end=None, epistemic=None, justification=None):
+    """old SUCCEEDS new (dated story: replaced/superseded/spun-off/rebranded...)."""
+    eid = edge_id or f"s_{old}_{new}"
+    e = {"edge_id": eid, "from": old, "to": new, "type": "SUCCEEDS",
+         "qualifier": qualifier}
+    return StagedFacts([("edge.create", e)]
+                       + _edge_extras(eid, start, end, epistemic, justification))
+
+
+def associate(view, a, b, qualifier, edge_id=None,
+              start=None, end=None, epistemic=None, justification=None):
+    """Ghost-layer story edge (solver-invisible by type)."""
+    eid = edge_id or f"a_{a}_{b}"
+    e = {"edge_id": eid, "from": a, "to": b, "type": "ASSOCIATION",
+         "qualifier": qualifier}
+    return StagedFacts([("edge.create", e)]
+                       + _edge_extras(eid, start, end, epistemic, justification))
 
 
 def classify(view, instance, type_, edge_id=None):

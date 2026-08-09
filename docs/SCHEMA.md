@@ -45,7 +45,7 @@ IS_TYPE_OF poly-hierarchy is legal (H17). Effective requirements = AND across al
 | `from_node`, `to_node` | node_id | direction = provider → consumer, always; navigable both ways (ADR-0023) |
 | `type` | enum (8-type basis, §3.1) | ADR-0024/0028 — the traversal partition key |
 | `qualifier` | slug | all flavor (§3.2); machine-invisible; secondary-indexed |
-| `truth_level` | enum EpistemicStatus (mainstream_fact → mythology) | ADR-0027 |
+| `truth_level` | enum EpistemicStatus (mainstream_fact → mythology) | ADR-0027; **absent = computed "unassessed" — never a default to mainstream (ADR-0042: standing builds from zero)** |
 | `validity` | enum ValidityStatus | ADR-0027 — disproven mechanisms between valid nodes |
 | `start_date`, `end_date` | DatePoint? | multiple active periods = multiple edges |
 | `constraints` | AttributeConstraint[] {attr, op GT/LT/EQ/CONTAINS, value, **class: PHYSICAL\|FITNESS**} | ADR-0005 (consumer defines the need) + ADR-0039 (class: PHYSICAL = nature's veto, feeds PROVEN_UNREALIZABLE, citation-required; FITNESS = purpose's veto, prunes per-query, the default — cost/size-for-purpose always FITNESS) + ADR-0037 (three-valued: undeclared/overlap → UNKNOWN; certain violation → VIOLATED) |

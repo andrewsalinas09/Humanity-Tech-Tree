@@ -25,6 +25,8 @@ Compiles: `node.create` + validity assertion. **Precondition (computed):** `sear
 | `succeed(old, new, qualifier)` | `old —SUCCEEDS→ new` (dated) | qualifier from vocabulary (canonicalized) |
 | `associate(a, b, qualifier)` | `a —ASSOCIATION→ b` | ghost layer; solver-invisible by type |
 
+**Initial conditions (ADR-0042 §3):** every creation verb accepts optional kwargs — `start`, `end`, `epistemic`, `justification` — compiling ONE atomic ChangeRequest, so edges are born complete (the fringe claim born FRINGE; the 2010 camera edge born dated). Anything unstated starts at ZERO, honestly labeled: epistemic absent = "unassessed" (never a mainstream default), validity absent = no standing (solver caps at UNKNOWN), citations absent = red. Justification is never required (except where law demands it: L3, exclusions, L13) but always encouraged.
+
 **Same-role trigger (L11, deterministic):** when a same-type edge into the same consumer exists whose provider shares a taxonomy ancestor with the new provider, `role` is REQUIRED: `"additional"` (joins implicit-AND) or `"alternative": edge_id` (compiles the OR into the consumer's requirement_expr, ADR-0017). Missing → **Decision** {additional | alternative-to-E} with the shared-ancestor evidence. No silent AND, no silent OR.
 
 ## Refinement (resolution-increasing, never destructive)
