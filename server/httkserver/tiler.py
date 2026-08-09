@@ -26,7 +26,69 @@ from httkdb.factlog import PgFactLog
 from httkserver.layout import layered_layout
 
 EXTENT = 4096
+BUF = 256                     # tile buffer: geometry clipped server-side (px)
 GHOST_TYPES = {"ASSOCIATION", "SUCCEEDS"}
+HARD = {"ENABLES", "IS_COMPONENT_OF", "IS_INGREDIENT_OF", "IS_TYPE_OF",
+        "IS_REFINEMENT_OF"}
+
+
+def _bezier(a, b, n=14):
+    """Organic arc between world points: quadratic bezier bowed perpendicular."""
+    (x0, y0), (x1, y1) = a, b
+    mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+    dx, dy = x1 - x0, y1 - y0
+    dist = (dx * dx + dy * dy) ** 0.5 or 1.0
+    bow = min(6.0, dist * 0.12)                 # degrees of sideways bow
+    cx, cy = mx - dy / dist * bow, my + dx / dist * bow
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        pts.append(((1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * x1,
+                    (1 - t) ** 2 * y0 + 2 * (1 - t) * t * cy + t * t * y1))
+    return pts
+
+
+def _clip_seg(p, q, lo, hi):
+    """Liang-Barsky segment clip to [lo,hi]^2 → clipped (p,q) or None."""
+    t0, t1 = 0.0, 1.0
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    for d, a in ((-dx, p[0] - lo), (dx, hi - p[0]), (-dy, p[1] - lo), (dy, hi - p[1])):
+        if d == 0:
+            if a < 0:
+                return None
+        else:
+            t = a / d
+            if d < 0:
+                if t > t1:
+                    return None
+                t0 = max(t0, t)
+            else:
+                if t < t0:
+                    return None
+                t1 = min(t1, t)
+    return ((p[0] + t0 * dx, p[1] + t0 * dy), (p[0] + t1 * dx, p[1] + t1 * dy))
+
+
+def _clip_polyline(pts, lo, hi):
+    """Clip a polyline to the box; returns runs of consecutive points."""
+    runs, cur = [], []
+    for i in range(len(pts) - 1):
+        seg = _clip_seg(pts[i], pts[i + 1], lo, hi)
+        if seg is None:
+            if len(cur) > 1:
+                runs.append(cur)
+            cur = []
+            continue
+        a, b = seg
+        if not cur:
+            cur = [a]
+        elif cur[-1] != a:
+            runs.append(cur)
+            cur = [a]
+        cur.append(b)
+    if len(cur) > 1:
+        runs.append(cur)
+    return runs
 
 app = FastAPI(title="httk-tiler")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
@@ -98,21 +160,19 @@ def tile(z: int, x: int, y: int):
         a, b = pos.get(e["from"]), pos.get(e["to"])
         if not a or not b:
             continue
-        pa = _lnglat_to_tilepx(a[0], a[1], z, x, y)
-        pb = _lnglat_to_tilepx(b[0], b[1], z, x, y)
-        # segment-bbox vs tile-bbox (1-tile buffer) — endpoint tests broke
-        # long edges mid-tile at zoom (user-reported bug)
-        lo_x, hi_x = min(pa[0], pb[0]), max(pa[0], pb[0])
-        lo_y, hi_y = min(pa[1], pb[1]), max(pa[1], pb[1])
-        if hi_x < -EXTENT or lo_x > 2 * EXTENT or hi_y < -EXTENT or lo_y > 2 * EXTENT:
-            continue
-        edges_feats.append({
-            "geometry": {"type": "LineString", "coordinates": [list(pa), list(pb)]},
-            "properties": {"edge_id": e["edge_id"], "type": e["type"],
-                           "qualifier": e.get("qualifier") or "",
-                           "ghost": e["type"] in GHOST_TYPES,
-                           "shadowed": view.is_shadowed(e["edge_id"])},
-        })
+        # organic arc in world space (consistent across tiles), then per-tile
+        # convert + Liang-Barsky clip to buffer — no breaks at any zoom
+        arc = _bezier((a[0], a[1]), (b[0], b[1]))
+        px = [_lnglat_to_tilepx(lng, lat, z, x, y) for lng, lat in arc]
+        for run in _clip_polyline(px, -BUF, EXTENT + BUF):
+            edges_feats.append({
+                "geometry": {"type": "LineString",
+                             "coordinates": [list(p) for p in run]},
+                "properties": {"edge_id": e["edge_id"], "type": e["type"],
+                               "qualifier": e.get("qualifier") or "",
+                               "ghost": e["type"] in GHOST_TYPES,
+                               "shadowed": view.is_shadowed(e["edge_id"])},
+            })
     data = mapbox_vector_tile.encode([
         {"name": "edges", "features": edges_feats},
         {"name": "nodes", "features": nodes_feats},
@@ -121,25 +181,53 @@ def tile(z: int, x: int, y: int):
 
 
 @app.get("/node/{node_id}")
-def node_card(node_id: str):
+def node_card(node_id: str, k: int = 7):
+    """The card is CHEAP (lazy principle): no solving here — realizability is a
+    question you ask (/solve). Neighbor lists are capped (counts + top-k)."""
     st = _state()
     view = st["view"]
     n = view.node(node_id)
     if n is None:
         return {"missing": node_id}
-    r = realizable(view, node_id)
+    ein, eout = view.edges_in(node_id), view.edges_out(node_id)
     return {
         "node": n,
         "name": view.field(node_id, "name") or node_id,
         "validity": view.field(node_id, "validity") or "unassessed",
         "cited": _cited(view, node_id),
-        "fields": {k[1]: v[1] for k, v in view._fields.items() if k[0] == node_id},
-        "edges_in": view.edges_in(node_id),
-        "edges_out": view.edges_out(node_id),
-        "solve": {"existence": r.existence.value, "fitness": r.fitness.value,
-                  "gaps": r.gaps[:20]},
+        "image_url": view.field(node_id, "image_url"),
+        "requires_count": len(ein), "requires": ein[:k],
+        "enables_count": len(eout), "enables": eout[:k],
         "position": st["pos"].get(node_id),
     }
+
+
+@app.get("/closure/{node_id}")
+def closure(node_id: str, depth: int = 64, cap: int = 5000):
+    """Full dependency closure BOTH ways over hard edges — what focus mode
+    lights up 'all the way up and all the way down' (user ruling)."""
+    view = _state()["view"]
+    nodes, edges = {node_id}, set()
+
+    def walk(start, downstream):
+        frontier = {start}
+        for _ in range(depth):
+            if not frontier or len(nodes) > cap:
+                return
+            nxt = set()
+            for n in frontier:
+                es = view.edges_out(n, HARD) if downstream else view.edges_in(n, HARD)
+                for e in es:
+                    edges.add(e["edge_id"])
+                    other = e["to"] if downstream else e["from"]
+                    if other not in nodes:
+                        nodes.add(other)
+                        nxt.add(other)
+            frontier = nxt
+
+    walk(node_id, downstream=True)    # everything this enables, transitively
+    walk(node_id, downstream=False)   # everything this rests on, transitively
+    return {"nodes": sorted(nodes), "edges": sorted(edges), "truncated": len(nodes) > cap}
 
 
 @app.get("/solve/{node_id}")
@@ -195,17 +283,19 @@ def style():
              "paint": {"background-color": "#ffffff"}},
             {"id": "edges", "type": "line", "source": "httk", "source-layer": "edges",
              "filter": ["!", ["get", "ghost"]],
-             "paint": {"line-color": ["case", ["get", "shadowed"], "#b9c2cf",
-                                      "#7d9bc4"],
-                       "line-width": 1.6,
-                       "line-opacity": [*DIM, 0.08, 0.85],
+             "layout": {"line-cap": "round", "line-join": "round"},
+             "paint": {"line-color": ["case", ["get", "shadowed"], "#c3ccd8",
+                                      "#8aa8cf"],
+                       "line-width": ["interpolate", ["linear"], ["zoom"],
+                                      2, 1.2, 8, 2.4],
+                       "line-opacity": [*DIM, 0.25, 0.8],
                        "line-dasharray": ["case", ["get", "shadowed"],
                                           ["literal", [2, 2]], ["literal", [1, 0]]]}},
             {"id": "node-ring", "type": "symbol", "source": "httk",
              "source-layer": "nodes", "filter": ["!", ["get", "cited"]],
              "layout": {"icon-image": "book-ring", "icon-size": 1.0,
                         "icon-allow-overlap": True},
-             "paint": {"icon-opacity": [*DIM, 0.08, 1.0]}},
+             "paint": {"icon-opacity": [*DIM, 0.3, 1.0]}},
             {"id": "nodes", "type": "symbol", "source": "httk",
              "source-layer": "nodes",
              "layout": {"icon-image": "book", "icon-size": 1.0,
@@ -214,12 +304,12 @@ def style():
                         "text-offset": [0, 2.1], "text-anchor": "top",
                         "text-optional": True},
              "paint": {"icon-color": cat_colors,
-                       "icon-opacity": [*DIM, 0.08,
+                       "icon-opacity": [*DIM, 0.3,
                                         ["match", ["get", "validity"],
                                          "unassessed", 0.45,
                                          "hypothetical", 0.55, 1.0]],
                        "text-color": "#1b2432",
-                       "text-opacity": [*DIM, 0.1, 1.0],
+                       "text-opacity": [*DIM, 0.3, 1.0],
                        "text-halo-color": "#ffffff", "text-halo-width": 1.4}},
         ],
         "center": [0, 20], "zoom": 2,

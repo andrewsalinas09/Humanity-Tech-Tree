@@ -1,6 +1,6 @@
 "use client";
-/** Planet v0.2 — user rulings: panel LEFT, tabs top, search upper-right,
- *  white world, book-shaped nodes, focus-dimming on selection. */
+/** Planet v0.3 — lazy solves (a question you ask), full-closure focus,
+ *  capped neighbor lists, node images, organic arcs underneath. */
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -8,27 +8,34 @@ import "maplibre-gl/dist/maplibre-gl.css";
 const TILER = process.env.NEXT_PUBLIC_TILER ?? "http://localhost:8748";
 
 type Card = {
-  name: string; validity: string; cited: boolean;
-  solve: { existence: string; fitness: string; gaps: [string, string][] };
-  edges_in: any[]; edges_out: any[]; missing?: string;
+  name: string; validity: string; cited: boolean; image_url?: string;
+  requires_count: number; requires: any[];
+  enables_count: number; enables: any[]; missing?: string;
+};
+type Solve = { existence: string; fitness: string; gaps: [string, string][] };
+
+const existenceWords: Record<string, [string, string]> = {
+  SATISFIED: ["Provable from recorded dependencies", "#19715f"],
+  UNKNOWN: ["Not yet provable", "#b8860b"],
+  VIOLATED: ["Impossible as recorded", "#b02a33"],
+};
+const fitnessWords: Record<string, [string, string]> = {
+  SATISFIED: ["fit for its consumers' stated demands", "#19715f"],
+  UNKNOWN: ["fitness unresolved", "#b8860b"],
+  VIOLATED: ["works, but unfit for stated demands", "#b02a33"],
 };
 
-/** A little book, slightly wider than a real one: rounded page + spine. */
 function bookImage(w = 38, h = 46, ring = false): ImageData {
   const r = 2, W = w * r, H = h * r;
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const g = c.getContext("2d")!;
-  const rr = (x: number, y: number, ww: number, hh: number, rad: number) => {
-    g.beginPath();
-    g.roundRect(x, y, ww, hh, rad);
-  };
   if (ring) {
     g.strokeStyle = "#e63946"; g.lineWidth = 3 * r;
-    rr(2 * r, 2 * r, W - 4 * r, H - 4 * r, 8 * r); g.stroke();
+    g.beginPath(); g.roundRect(2 * r, 2 * r, W - 4 * r, H - 4 * r, 8 * r); g.stroke();
   } else {
-    g.fillStyle = "#fff";                       // SDF alpha shape (tinted by style)
-    rr(0, 0, W, H, 6 * r); g.fill();
+    g.fillStyle = "#fff";
+    g.beginPath(); g.roundRect(0, 0, W, H, 6 * r); g.fill();
   }
   return g.getImageData(0, 0, W, H);
 }
@@ -37,7 +44,11 @@ export default function Home() {
   const mapDiv = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const seqRef = useRef<number>(-1);
+  const selRef = useRef<string | null>(null);
   const [card, setCard] = useState<Card | null>(null);
+  const [sel, setSel] = useState<string | null>(null);
+  const [solve, setSolve] = useState<Solve | null>(null);
+  const [solving, setSolving] = useState(false);
   const [seq, setSeq] = useState(0);
   const [tab, setTab] = useState("Explore");
   const [q, setQ] = useState("");
@@ -47,28 +58,36 @@ export default function Home() {
     map.removeFeatureState({ source: "httk", sourceLayer: "edges" });
   };
 
-  const focusOn = async (map: maplibregl.Map, id: string) => {
-    const data: Card = await (await fetch(`${TILER}/node/${id}`)).json();
-    setCard(data);
-    if (data.missing) return;
-    const family = new Set<string>([id]);
-    data.edges_in.forEach((e: any) => family.add(e.from));
-    data.edges_out.forEach((e: any) => family.add(e.to));
-    const keepEdges = new Set<string>(
-      [...data.edges_in, ...data.edges_out].map((e: any) => e.edge_id));
+  const applyDim = async (map: maplibregl.Map, id: string) => {
+    // full dependency closure, all the way up and all the way down
+    const cl = await (await fetch(`${TILER}/closure/${id}`)).json();
+    const nodes = new Set<string>(cl.nodes), edges = new Set<string>(cl.edges);
     clearDim(map);
     for (const f of map.querySourceFeatures("httk", { sourceLayer: "nodes" })) {
       const nid = f.properties?.node_id;
-      if (nid && !family.has(nid))
+      if (nid && !nodes.has(nid))
         map.setFeatureState({ source: "httk", sourceLayer: "nodes", id: nid },
                             { dim: true });
     }
     for (const f of map.querySourceFeatures("httk", { sourceLayer: "edges" })) {
       const eid = f.properties?.edge_id;
-      if (eid && !keepEdges.has(eid))
+      if (eid && !edges.has(eid))
         map.setFeatureState({ source: "httk", sourceLayer: "edges", id: eid },
                             { dim: true });
     }
+  };
+
+  const focusOn = async (map: maplibregl.Map, id: string) => {
+    selRef.current = id; setSel(id); setSolve(null);
+    setCard(await (await fetch(`${TILER}/node/${id}`)).json());
+    applyDim(map, id);
+  };
+
+  const askSolve = async () => {
+    if (!selRef.current) return;
+    setSolving(true);
+    setSolve(await (await fetch(`${TILER}/solve/${selRef.current}`)).json());
+    setSolving(false);
   };
 
   useEffect(() => {
@@ -87,10 +106,14 @@ export default function Home() {
     });
     map.on("click", (e) => {
       const hits = map.queryRenderedFeatures(e.point, { layers: ["nodes"] });
-      if (!hits.length) { clearDim(map); setCard(null); }   // background: unfocus
+      if (!hits.length) { clearDim(map); setCard(null); setSel(null); setSolve(null);
+                          selRef.current = null; }
     });
     map.on("mouseenter", "nodes", () => (map.getCanvas().style.cursor = "pointer"));
     map.on("mouseleave", "nodes", () => (map.getCanvas().style.cursor = ""));
+    map.on("sourcedata", () => {           // re-apply dim when tiles reload
+      if (selRef.current) applyDim(map, selRef.current);
+    });
 
     const poll = setInterval(async () => {
       try {
@@ -103,6 +126,7 @@ export default function Home() {
       } catch { /* tiler down; keep polling */ }
     }, 2000);
     return () => { clearInterval(poll); map.remove(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const doSearch = async (ev: React.FormEvent) => {
@@ -117,6 +141,23 @@ export default function Home() {
   };
 
   const S = styles;
+  const NeighborList = ({ title, items, total, dir }:
+    { title: string; items: any[]; total: number; dir: "from" | "to" }) => (
+    <div>
+      <h4 style={{ margin: "14px 0 4px" }}>{title} ({total})</h4>
+      <ul style={{ margin: 0 }}>
+        {items.map((e) => (
+          <li key={e.edge_id} style={S.link}
+              onClick={() => mapRef.current && focusOn(mapRef.current, e[dir])}>
+            {e[dir]} <small style={{ opacity: 0.45 }}>{e.type}</small>
+          </li>))}
+      </ul>
+      {total > items.length &&
+        <div style={{ opacity: 0.5, fontSize: 12, marginTop: 2 }}>
+          +{total - items.length} more — explore on the map</div>}
+    </div>
+  );
+
   return (
     <div style={S.shell}>
       <header style={S.tabs}>
@@ -136,33 +177,40 @@ export default function Home() {
             Everything builds from zero.</p>}
           {card && !card.missing && (
             <div>
+              {card.image_url &&
+                <img src={card.image_url} alt="" style={S.img} />}
               <h2 style={{ margin: "4px 0 10px" }}>{card.name}</h2>
               <p>
                 <Chip ok={card.validity === "current_truth"}
                       label={`validity: ${card.validity}`} />{" "}
                 <Chip ok={card.cited} label={card.cited ? "cited" : "needs citation"} />
               </p>
-              <p>existence: <b>{card.solve.existence}</b><br />
-                 fitness: <b>{card.solve.fitness}</b></p>
-              {card.solve.gaps.length > 0 && (
-                <details open>
-                  <summary style={{ color: "#b8860b", cursor: "pointer" }}>
-                    {card.solve.gaps.length} unresolved (the gap list)
-                  </summary>
-                  <ul>{card.solve.gaps.map(([s, w], i) =>
-                    <li key={i} style={{ opacity: 0.8 }}>{s}: {w}</li>)}</ul>
-                </details>
-              )}
-              <h4>requires ({card.edges_in.length})</h4>
-              <ul>{card.edges_in.map((e) =>
-                <li key={e.edge_id} style={S.link}
-                    onClick={() => mapRef.current && focusOn(mapRef.current, e.from)}>
-                  {e.from} <small style={{ opacity: 0.45 }}>{e.type}</small></li>)}</ul>
-              <h4>enables ({card.edges_out.length})</h4>
-              <ul>{card.edges_out.map((e) =>
-                <li key={e.edge_id} style={S.link}
-                    onClick={() => mapRef.current && focusOn(mapRef.current, e.to)}>
-                  {e.to} <small style={{ opacity: 0.45 }}>{e.type}</small></li>)}</ul>
+              {!solve &&
+                <button onClick={askSolve} disabled={solving} style={S.solveBtn}>
+                  {solving ? "solving…" : "Can this be built? (ask the solver)"}
+                </button>}
+              {solve && (
+                <div style={S.solveBox}>
+                  <b style={{ color: existenceWords[solve.existence]?.[1] }}>
+                    {existenceWords[solve.existence]?.[0] ?? solve.existence}
+                  </b>
+                  <div style={{ color: fitnessWords[solve.fitness]?.[1],
+                                fontSize: 13 }}>
+                    {fitnessWords[solve.fitness]?.[0] ?? solve.fitness}
+                  </div>
+                  {solve.gaps.length > 0 && (
+                    <details open>
+                      <summary style={{ color: "#b8860b", cursor: "pointer" }}>
+                        {solve.gaps.length} unresolved
+                      </summary>
+                      <ul>{solve.gaps.slice(0, 12).map(([s, w], i) =>
+                        <li key={i} style={{ opacity: 0.8 }}>{s}: {w}</li>)}</ul>
+                    </details>)}
+                </div>)}
+              <NeighborList title="requires" items={card.requires}
+                            total={card.requires_count} dir="from" />
+              <NeighborList title="enables" items={card.enables}
+                            total={card.enables_count} dir="to" />
             </div>
           )}
         </aside>
@@ -200,6 +248,12 @@ const styles: Record<string, React.CSSProperties> = {
   panel: { width: 380, padding: 16, overflowY: "auto",
            borderRight: "1px solid #e4e8ef", fontSize: 14 },
   link: { cursor: "pointer" },
+  img: { width: "100%", borderRadius: 10, marginBottom: 8,
+         border: "1px solid #e4e8ef" },
+  solveBtn: { padding: "8px 12px", borderRadius: 10, border: "1px solid #cfd6e0",
+              background: "#f6f8fb", cursor: "pointer", fontSize: 13 },
+  solveBox: { padding: "10px 12px", borderRadius: 10, background: "#f6f8fb",
+              border: "1px solid #e4e8ef", margin: "6px 0" },
   search: { position: "absolute", top: 12, right: 12, zIndex: 5 },
   searchInput: { padding: "8px 12px", borderRadius: 10, width: 240,
                  border: "1px solid #cfd6e0", background: "#fff", fontSize: 14,
