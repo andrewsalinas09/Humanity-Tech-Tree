@@ -809,6 +809,31 @@ class Service:
             # remedies run VERBATIM — the challenge.resolve fact is already
             # the provenance for every one of them
             for r in ch["body"].get("remedy", []):
+                if r.get("verb") == "tombstone":
+                    # removal as a remedy: the admin ratifying THIS challenge
+                    # is the same gate ADR-0047 demands, so the tombstone is
+                    # legal here — provenance is the challenge itself
+                    subj = r.get("params", {}).get("subject")
+                    _, view = self._kernel()
+                    if view.edge(subj):
+                        fact = ("edge.tombstone",
+                                {"edge_id": subj,
+                                 "reason": f"challenge {challenge_id} upheld"})
+                    elif view.node(subj):
+                        fact = ("node.tombstone",
+                                {"node_id": subj,
+                                 "reason": f"challenge {challenge_id} upheld"})
+                    else:
+                        remedy_results.append({"verb": "tombstone",
+                                               "result": {"rejected": {
+                                                   "rule": "E404",
+                                                   "message": f"{subj}?"}}})
+                        continue
+                    remedy_results.append(
+                        {"verb": "tombstone",
+                         "result": self._apply(identity, [fact],
+                                               [f"challenge {challenge_id}"])})
+                    continue
                 remedy_results.append(
                     {"verb": r.get("verb"),
                      "result": self.execute(token, r.get("verb"),

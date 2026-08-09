@@ -234,13 +234,60 @@ export default function Home() {
                       : `${res.rejected?.rule}: ${res.rejected?.message}`);
   };
 
-  const dispute = async () => {
-    const grounds = window.prompt("What's wrong here? (grounds — recorded forever)");
-    if (!grounds) return;
-    const res = await api("/challenges", { subject: selRef.current, grounds });
-    alert(res.challenge ? `Challenge ${res.challenge} opened — voting in the Tickets tab.`
-                        : JSON.stringify(res.rejected ?? res));
+  // dispute WITH the fix attached (user ruling: "make the EDIT with the
+  // dispute; it resolves with votes + admin") — remedy compiles to verbs
+  const [disp, setDisp] = useState<any | null>(null);   // {kind, subject, edge?}
+  const [dForm, setDForm] = useState({ grounds: "", fix: "none",
+                                       newType: "ENABLES", end: "to",
+                                       target: "", newCat: "TECHNOLOGY" });
+  const EDGE_VERB: Record<string, (f: string, t: string, j: string) => any> = {
+    ENABLES: (f, t, j) => ({ verb: "add_enabler", params: { enabled: t, enabler: f, justification: j } }),
+    IS_COMPONENT_OF: (f, t, j) => ({ verb: "add_component", params: { whole: t, part: f, justification: j } }),
+    IS_INGREDIENT_OF: (f, t, j) => ({ verb: "add_ingredient", params: { product: t, ingredient: f, justification: j } }),
+    IS_TYPE_OF: (f, t) => ({ verb: "classify", params: { instance: f, type_: t } }),
+    IS_REFINEMENT_OF: (f, t) => ({ verb: "refine", params: { family: t, version: f } }),
+    SUCCEEDS: (f, t) => ({ verb: "succeed", params: { old: f, new: t, qualifier: "replaced" } }),
+    ASSOCIATION: (f, t) => ({ verb: "associate", params: { a: f, b: t, qualifier: "related" } }),
   };
+  const openDispute = (kind: "node" | "edge", subject: string, edge?: any) => {
+    setDisp({ kind, subject, edge });
+    setDForm({ grounds: "", fix: "none", newType: edge?.type ?? "ENABLES",
+               end: "to", target: "", newCat: "TECHNOLOGY" });
+  };
+  const submitDispute = async () => {
+    if (!dForm.grounds.trim()) { alert("Grounds required."); return; }
+    const remedy: any[] = [];
+    const g = dForm.grounds.trim();
+    if (disp.kind === "edge" && disp.edge) {
+      const e = disp.edge;
+      if (dForm.fix === "remove")
+        remedy.push({ verb: "tombstone", params: { subject: disp.subject } });
+      else if (dForm.fix === "retype") {
+        remedy.push(EDGE_VERB[dForm.newType](e.from, e.to, g));
+        remedy.push({ verb: "tombstone", params: { subject: disp.subject } });
+      } else if (dForm.fix === "reconnect" && dForm.target) {
+        const f = dForm.end === "from" ? dForm.target : e.from;
+        const t = dForm.end === "to" ? dForm.target : e.to;
+        remedy.push(EDGE_VERB[e.type](f, t, g));
+        remedy.push({ verb: "tombstone", params: { subject: disp.subject } });
+      }
+    } else if (disp.kind === "node") {
+      if (dForm.fix === "remove")
+        remedy.push({ verb: "tombstone", params: { subject: disp.subject } });
+      else if (dForm.fix === "reclassify")
+        remedy.push({ verb: "reclassify",
+                      params: { node_id: disp.subject,
+                                new_category: dForm.newCat, justification: g } });
+    }
+    const res = await api("/challenges",
+                          { subject: disp.subject, grounds: g, remedy });
+    if (res.challenge) {
+      alert(`Challenge ${res.challenge} opened${remedy.length
+        ? " with the fix staged" : ""} — voting in the Tickets tab.`);
+      setDisp(null);
+    } else alert(JSON.stringify(res.rejected ?? res));
+  };
+  const dispute = () => openDispute("node", selRef.current!);
 
   const markDelete = async () => {
     const reason = window.prompt("Reason for deletion request (admin approves):");
@@ -624,10 +671,8 @@ export default function Home() {
         params: { assertion_id: eid, source_node: source, locator } });
       alert(res.applied ? "Cited." : JSON.stringify(res.rejected ?? res));
     } else if (kind === "dispute") {
-      const grounds = window.prompt("What's wrong with this link? (grounds)");
-      if (!grounds) return;
-      const res = await api("/challenges", { subject: eid, grounds });
-      alert(res.challenge ? `Challenge ${res.challenge} opened.` : JSON.stringify(res));
+      openDispute("edge", eid, edgeCard);
+      return;
     } else {
       const reason = window.prompt("Reason for deletion request (admin approves):");
       if (!reason) return;
@@ -937,6 +982,14 @@ export default function Home() {
                   <Chip ok={c.status !== "open"}
                         label={c.status} />
                   <div style={{ fontSize: 12.5, opacity: 0.8 }}>{c.grounds}</div>
+                  {(c.remedy ?? []).length > 0 && (
+                    <div style={{ fontSize: 12, margin: "3px 0",
+                                  color: "#7a5c2e" }}>
+                      if upheld: {c.remedy.map((r: any) =>
+                        `${r.verb}(${Object.entries(r.params ?? {})
+                          .filter(([k]) => k !== "justification")
+                          .map(([, v]) => v).join(", ")})`).join(" → ")}
+                    </div>)}
                   {c.tally && (
                     <div style={{ fontSize: 12, margin: "4px 0" }}>
                       ⚖ support {c.tally.support} · oppose {c.tally.oppose}
@@ -974,6 +1027,58 @@ export default function Home() {
                     marked by {d.marked_by ?? "?"} · approved by {d.approved_by}
                   </div>
                 </div>))}
+            </div>
+          )}
+          {tab === "Explore" && disp && (
+            <div style={S.orBox}>
+              <div style={S.orTitle}>
+                dispute {disp.kind}: {disp.subject}</div>
+              <textarea placeholder="What's wrong? (grounds — recorded forever)"
+                        value={dForm.grounds} rows={2} style={S.input}
+                        onChange={(e) => setDForm({ ...dForm, grounds: e.target.value })} />
+              <select value={dForm.fix} style={S.input}
+                      onChange={(e) => setDForm({ ...dForm, fix: e.target.value })}>
+                <option value="none">no staged fix (grounds only)</option>
+                {disp.kind === "edge" ? (<>
+                  <option value="retype">fix: change the relationship type</option>
+                  <option value="reconnect">fix: reconnect an endpoint</option>
+                  <option value="remove">fix: remove this edge</option>
+                </>) : (<>
+                  <option value="reclassify">fix: change the category</option>
+                  <option value="remove">fix: remove this node</option>
+                </>)}
+              </select>
+              {dForm.fix === "retype" && (
+                <select value={dForm.newType} style={S.input}
+                        onChange={(e) => setDForm({ ...dForm, newType: e.target.value })}>
+                  {Object.keys(EDGE_VERB).map((t) => (
+                    <option key={t} value={t}>
+                      {t.toLowerCase().replace(/_/g, " ")}</option>))}
+                </select>)}
+              {dForm.fix === "reconnect" && (<>
+                <select value={dForm.end} style={S.input}
+                        onChange={(e) => setDForm({ ...dForm, end: e.target.value })}>
+                  <option value="to">new consumer (the → end)</option>
+                  <option value="from">new provider (the ← end)</option>
+                </select>
+                {dForm.target
+                  ? <div style={{ margin: "4px 0" }}>
+                      <Chip ok label={dForm.target} />{" "}
+                      <button style={S.miniBtn}
+                              onClick={() => setDForm({ ...dForm, target: "" })}>
+                        ✕</button></div>
+                  : <SearchBox compact placeholder="find the new endpoint…"
+                      onPick={(r) => setDForm({ ...dForm, target: r.node_id })} />}
+              </>)}
+              {dForm.fix === "reclassify" && (
+                <select value={dForm.newCat} style={S.input}
+                        onChange={(e) => setDForm({ ...dForm, newCat: e.target.value })}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>
+                    {c.toLowerCase().replace(/_/g, " ")}</option>)}
+                </select>)}
+              <button onClick={submitDispute} style={S.solveBtn}>
+                Open dispute{dForm.fix !== "none" ? " with fix staged" : ""}</button>{" "}
+              <button onClick={() => setDisp(null)} style={S.miniBtn}>cancel</button>
             </div>
           )}
           {tab === "Explore" && !showAdd && edgeCard && (
