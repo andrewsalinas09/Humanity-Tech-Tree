@@ -28,6 +28,7 @@ Domain terms used across docs, code, and conversations. Keep alphabetical.
 - **Golden Spike** — the first end-to-end vertical slice proving the solver (e.g. Boolean Logic → Vacuum Tubes → Transistor → Intel 4004).
 - **Identity container** — a family root whose family-wide claims have all been date-bounded, widened, or pushed to generations, leaving only name, succession, and story edges; the legal, honest end state of a Ship-of-Theseus lineage (ADR-0022).
 - **Instance** — a concrete realization of an abstract node, connected via IS_TYPE_OF; an ordinary node, never a sub-ID.
+- **Intercept** — the wizard verb inserting a node mid-edge (Transistor→CPU becomes Transistor→Logic Gate→CPU): one CR with two new edges + treatment of the original by truth-status — *true-but-coarse* → shadowed (stays forever as zoomed-out truth, ADR-0021); *wrong-target* → archived (lifecycle). Downstream consumers untouched; no level reset (the original claim never changed); fully order-independent and infinitely repeatable — every edge is a standing invitation to insert more resolution.
 - **Knowledge status** — whether know-how is active, theoretical, lost, obsolete, or mythical *in a given region and time segment*.
 - **Lazy abstraction** — link to the most specific true leaf; create abstract parents only when a second implementation forces it.
 - **Lazy Split** — when unsure node-vs-attribute, start as attribute: splitting later is easy, merging nodes is hard.
